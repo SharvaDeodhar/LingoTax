@@ -70,16 +70,19 @@ class GNNModel(nn.Module):
         self.dropout = dropout
 
         # ── Encoder layers ────────────────────────────────────────────────────
-        self.convs = nn.ModuleList()
+        # Always build MLP (Linear) layers for tabular / no-graph mode.
+        # Additionally build SAGEConv layers if PyG is available, for when
+        # a graph (edge_index) IS provided at forward time.
+        self.mlp_layers = nn.ModuleList()
+        self.mlp_layers.append(nn.Linear(input_dim, hidden_dim))
+        for _ in range(num_layers - 1):
+            self.mlp_layers.append(nn.Linear(hidden_dim, hidden_dim))
+
+        self.sage_layers = nn.ModuleList()
         if HAS_PYG:
-            self.convs.append(SAGEConv(input_dim, hidden_dim))
+            self.sage_layers.append(SAGEConv(input_dim, hidden_dim))
             for _ in range(num_layers - 1):
-                self.convs.append(SAGEConv(hidden_dim, hidden_dim))
-        else:
-            # MLP fallback when PyG is missing
-            self.convs.append(nn.Linear(input_dim, hidden_dim))
-            for _ in range(num_layers - 1):
-                self.convs.append(nn.Linear(hidden_dim, hidden_dim))
+                self.sage_layers.append(SAGEConv(hidden_dim, hidden_dim))
 
         self.norms = nn.ModuleList([nn.BatchNorm1d(hidden_dim) for _ in range(num_layers)])
 
@@ -96,11 +99,14 @@ class GNNModel(nn.Module):
     ) -> torch.Tensor:
         """Encode raw user features into hidden representations."""
         h = user_x
-        for i, conv in enumerate(self.convs):
-            if HAS_PYG and edge_index is not None:
-                h = conv(h, edge_index)
+        use_graph = HAS_PYG and edge_index is not None and len(self.sage_layers) > 0
+        layers = self.sage_layers if use_graph else self.mlp_layers
+
+        for i, layer in enumerate(layers):
+            if use_graph:
+                h = layer(h, edge_index)
             else:
-                h = conv(h)
+                h = layer(h)
             h = self.norms[i](h)
             h = F.relu(h)
             h = F.dropout(h, p=self.dropout, training=self.training)

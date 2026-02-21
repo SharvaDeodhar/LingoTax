@@ -68,7 +68,11 @@ def train(args: argparse.Namespace) -> None:
     device = "cuda" if args.gpu and torch.cuda.is_available() else "cpu"
     logger.info("Training on device: %s", device)
 
-    # ── Data ──────────────────────────────────────────────────────────────────
+    # Resolve output dir relative to this script's parent (model/) if not specified
+    if args.output_dir is None:
+        output_dir = Path(__file__).resolve().parent.parent / "models"
+    else:
+        output_dir = Path(args.output_dir)
     dataset = build_dataset(seed=args.seed, small=args.small)
     X_train = dataset["X_train"].to(device)
     y_train = dataset["y_train"].to(device)
@@ -98,7 +102,6 @@ def train(args: argparse.Namespace) -> None:
     patience = 10
     best_metrics = {}
 
-    output_dir = Path(args.output_dir)
     ckpt_dir = output_dir / "checkpoints"
     meta_dir = output_dir / "metadata"
     ckpt_dir.mkdir(parents=True, exist_ok=True)
@@ -192,8 +195,8 @@ def main():
     parser.add_argument("--gpu", action="store_true")
     parser.add_argument("--small", action="store_true", help="Smoke test on 500 samples")
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--output-dir", type=str, default="model/models",
-                        help="Directory for checkpoints and metadata")
+    parser.add_argument("--output-dir", type=str, default=None,
+                        help="Directory for checkpoints and metadata (default: model/models/)")
     args = parser.parse_args()
     train(args)
 

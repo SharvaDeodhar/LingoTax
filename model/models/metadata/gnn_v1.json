@@ -1,59 +1,59 @@
 {
-    "name": "gnn_v1",
-    "created_at": "",
-    "train_size": 0,
-    "val_size": 0,
-    "seed": 42,
-    "hidden_dim": 64,
-    "epochs": 50,
-    "learning_rate": 0.001,
-    "best_val_loss": null,
-    "metrics": {
-        "macro_auc": null,
-        "foreign_tax_credit": {
-            "auc": null,
-            "precision": null,
-            "recall": null
-        },
-        "student_loan_interest": {
-            "auc": null,
-            "precision": null,
-            "recall": null
-        },
-        "standard_deduction": {
-            "auc": null,
-            "precision": null,
-            "recall": null
-        },
-        "earned_income_credit": {
-            "auc": null,
-            "precision": null,
-            "recall": null
-        },
-        "child_tax_credit": {
-            "auc": null,
-            "precision": null,
-            "recall": null
-        },
-        "educator_expense": {
-            "auc": null,
-            "precision": null,
-            "recall": null
-        },
-        "ira_deduction": {
-            "auc": null,
-            "precision": null,
-            "recall": null
-        },
-        "home_ownership_credit": {
-            "auc": null,
-            "precision": null,
-            "recall": null
-        }
+  "name": "gnn_v1",
+  "created_at": "2026-02-21T21:27:54.043252+00:00",
+  "train_size": 425,
+  "val_size": 75,
+  "seed": 42,
+  "hidden_dim": 64,
+  "epochs": 20,
+  "learning_rate": 0.001,
+  "best_val_loss": 0.404083,
+  "metrics": {
+    "foreign_tax_credit": {
+      "auc": 0.8794,
+      "precision": 0.8462,
+      "recall": 0.7857
     },
-    "device": "",
-    "elapsed_seconds": null,
-    "git_commit": "PLACEHOLDER",
-    "download_url": "",
-    "notes": "Template — populated after training. Replace with actual values."
+    "student_loan_interest": {
+      "auc": 0.8092,
+      "precision": 0.75,
+      "recall": 0.4737
+    },
+    "standard_deduction": {
+      "auc": 0.4496,
+      "precision": 0.8933,
+      "recall": 1.0
+    },
+    "earned_income_credit": {
+      "auc": 0.8056,
+      "precision": 0.6829,
+      "recall": 0.7778
+    },
+    "child_tax_credit": {
+      "auc": 0.9271,
+      "precision": 0.8254,
+      "recall": 0.9811
+    },
+    "educator_expense": {
+      "auc": 0.5185,
+      "precision": 0.0,
+      "recall": 0.0
+    },
+    "ira_deduction": {
+      "auc": 0.6344,
+      "precision": 0.5,
+      "recall": 0.04
+    },
+    "home_ownership_credit": {
+      "auc": 0.8956,
+      "precision": 0.8077,
+      "recall": 0.8077
+    },
+    "macro_auc": 0.7399
+  },
+  "device": "cpu",
+  "elapsed_seconds": 0.4,
+  "git_commit": "PLACEHOLDER",
+  "download_url": "",
+  "notes": "Trained on synthetic distribution-aware data. Replace with real IRS SOI data for production."
 }
