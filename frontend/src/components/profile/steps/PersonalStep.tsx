@@ -6,7 +6,7 @@ import type { FilingStatus } from "@/types";
 interface PersonalStepProps {
   data: {
     filing_year: number;
-    filing_status: string;
+    filing_status: string | null;
     num_dependents: number;
   };
   onChange: (field: string, value: unknown) => void;
