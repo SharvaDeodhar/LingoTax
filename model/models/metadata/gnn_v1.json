@@ -1,58 +1,58 @@
 {
   "name": "gnn_v1",
-  "created_at": "2026-02-21T21:27:54.043252+00:00",
-  "train_size": 425,
-  "val_size": 75,
+  "created_at": "2026-02-21T21:33:01.673453+00:00",
+  "train_size": 17000,
+  "val_size": 3000,
   "seed": 42,
   "hidden_dim": 64,
-  "epochs": 20,
+  "epochs": 50,
   "learning_rate": 0.001,
-  "best_val_loss": 0.404083,
+  "best_val_loss": 0.356698,
   "metrics": {
     "foreign_tax_credit": {
-      "auc": 0.8794,
-      "precision": 0.8462,
-      "recall": 0.7857
+      "auc": 0.9294,
+      "precision": 0.9369,
+      "recall": 0.8498
     },
     "student_loan_interest": {
-      "auc": 0.8092,
-      "precision": 0.75,
-      "recall": 0.4737
+      "auc": 0.8842,
+      "precision": 0.8772,
+      "recall": 0.7782
     },
     "standard_deduction": {
-      "auc": 0.4496,
-      "precision": 0.8933,
+      "auc": 0.4847,
+      "precision": 0.8473,
       "recall": 1.0
     },
     "earned_income_credit": {
-      "auc": 0.8056,
-      "precision": 0.6829,
-      "recall": 0.7778
+      "auc": 0.8986,
+      "precision": 0.8065,
+      "recall": 0.9188
     },
     "child_tax_credit": {
-      "auc": 0.9271,
-      "precision": 0.8254,
-      "recall": 0.9811
+      "auc": 0.9012,
+      "precision": 0.9167,
+      "recall": 0.9511
     },
     "educator_expense": {
-      "auc": 0.5185,
+      "auc": 0.4907,
       "precision": 0.0,
       "recall": 0.0
     },
     "ira_deduction": {
-      "auc": 0.6344,
-      "precision": 0.5,
-      "recall": 0.04
+      "auc": 0.6177,
+      "precision": 0.0,
+      "recall": 0.0
     },
     "home_ownership_credit": {
-      "auc": 0.8956,
-      "precision": 0.8077,
-      "recall": 0.8077
+      "auc": 0.9415,
+      "precision": 0.9286,
+      "recall": 0.9023
     },
-    "macro_auc": 0.7399
+    "macro_auc": 0.7685
   },
-  "device": "cpu",
-  "elapsed_seconds": 0.4,
+  "device": "cuda",
+  "elapsed_seconds": 5.3,
   "git_commit": "PLACEHOLDER",
   "download_url": "",
   "notes": "Trained on synthetic distribution-aware data. Replace with real IRS SOI data for production."
