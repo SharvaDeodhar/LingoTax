@@ -1,0 +1,59 @@
+{
+    "name": "gnn_v1",
+    "created_at": "",
+    "train_size": 0,
+    "val_size": 0,
+    "seed": 42,
+    "hidden_dim": 64,
+    "epochs": 50,
+    "learning_rate": 0.001,
+    "best_val_loss": null,
+    "metrics": {
+        "macro_auc": null,
+        "foreign_tax_credit": {
+            "auc": null,
+            "precision": null,
+            "recall": null
+        },
+        "student_loan_interest": {
+            "auc": null,
+            "precision": null,
+            "recall": null
+        },
+        "standard_deduction": {
+            "auc": null,
+            "precision": null,
+            "recall": null
+        },
+        "earned_income_credit": {
+            "auc": null,
+            "precision": null,
+            "recall": null
+        },
+        "child_tax_credit": {
+            "auc": null,
+            "precision": null,
+            "recall": null
+        },
+        "educator_expense": {
+            "auc": null,
+            "precision": null,
+            "recall": null
+        },
+        "ira_deduction": {
+            "auc": null,
+            "precision": null,
+            "recall": null
+        },
+        "home_ownership_credit": {
+            "auc": null,
+            "precision": null,
+            "recall": null
+        }
+    },
+    "device": "",
+    "elapsed_seconds": null,
+    "git_commit": "PLACEHOLDER",
+    "download_url": "",
+    "notes": "Template — populated after training. Replace with actual values."
+}
