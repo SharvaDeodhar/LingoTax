@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PDFDocument } from "pdf-lib";
 import { Save, ArrowLeft, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { saveEditedPdf } from "@/lib/api/fastapi";
@@ -31,6 +31,8 @@ export function PdfFormEditor({
     const [error, setError] = useState<string | null>(null);
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [noFields, setNoFields] = useState(false);
+    const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+    const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Load form fields from PDF
     useEffect(() => {
@@ -111,7 +113,55 @@ export function PdfFormEditor({
         setFields((prev) =>
             prev.map((f, i) => (i === index ? { ...f, value } : f))
         );
+        // Trigger auto-save after 5 seconds of inactivity
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+        }
+        setAutoSaveStatus("idle");
+        autoSaveTimerRef.current = setTimeout(() => {
+            triggerAutoSave();
+        }, 5000);
     }, []);
+
+    const triggerAutoSave = useCallback(async () => {
+        setAutoSaveStatus("saving");
+        try {
+            const { PDFDocument } = await import("pdf-lib");
+            const pdfDoc = await PDFDocument.load(pdfBytes);
+            const form = pdfDoc.getForm();
+
+            // We need the current fields, so we read from the state ref
+            const currentFields = fields;
+            for (const field of currentFields) {
+                try {
+                    if (field.type === "text") {
+                        const tf = form.getTextField(field.name);
+                        tf.setText(field.value);
+                    } else if (field.type === "checkbox") {
+                        const cb = form.getCheckBox(field.name);
+                        if (field.value === "true") cb.check();
+                        else cb.uncheck();
+                    } else if (field.type === "dropdown") {
+                        const dd = form.getDropdown(field.name);
+                        if (field.value) dd.select(field.value);
+                    } else if (field.type === "radio") {
+                        const rg = form.getRadioGroup(field.name);
+                        if (field.value) rg.select(field.value);
+                    }
+                } catch {
+                    // Skip fields that can't be set
+                }
+            }
+
+            const modifiedBytes = await pdfDoc.save();
+            await saveEditedPdf(documentId, modifiedBytes);
+            setAutoSaveStatus("saved");
+            setTimeout(() => setAutoSaveStatus("idle"), 3000);
+        } catch (err) {
+            console.error("Auto-save failed:", err);
+            setAutoSaveStatus("idle");
+        }
+    }, [pdfBytes, fields, documentId]);
 
     const handleSave = useCallback(async () => {
         setSaving(true);
@@ -225,6 +275,20 @@ export function PdfFormEditor({
                     )}
                     {saving ? "Saving…" : saveSuccess ? "Saved!" : "Save PDF"}
                 </button>
+
+                {/* Auto-save status */}
+                {autoSaveStatus === "saving" && (
+                    <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Auto-saving…
+                    </span>
+                )}
+                {autoSaveStatus === "saved" && (
+                    <span className="text-[10px] text-green-500 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        All changes saved
+                    </span>
+                )}
             </div>
 
             {/* Error */}
