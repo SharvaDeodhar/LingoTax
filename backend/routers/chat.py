@@ -28,8 +28,51 @@ from rag.chain import (
     check_for_highlight
 )
 from langchain_core.messages import HumanMessage, AIMessage
+from services.gnn_service import gnn_service
 
 router = APIRouter()
+
+def build_profile_summary(user_id: str, db: Client) -> str:
+    """Fetch user questionnaire and GNN predictions to build a rich context string."""
+    profile_summary = ""
+    q_res = (
+        db.table("questionnaires")
+        .select(
+            "filing_status, residency_status, visa_type, income_sources, "
+            "states_worked, has_ssn, has_itin, num_dependents, immigration_statuses"
+        )
+        .eq("user_id", user_id)
+        .order("filing_year", desc=True)
+        .limit(1)
+        .maybe_single()
+        .execute()
+    )
+    if q_res.data:
+        q = q_res.data
+        parts = []
+        if q.get("filing_status"): parts.append(f"Filing status: {q['filing_status']}")
+        if q.get("residency_status"): parts.append(f"Residency: {q['residency_status']}")
+        if q.get("visa_type"): parts.append(f"Visa type: {q['visa_type']}")
+        if q.get("income_sources"): parts.append(f"Income sources: {', '.join(q['income_sources'])}")
+        if q.get("states_worked"): parts.append(f"States worked: {', '.join(q['states_worked'])}")
+        if q.get("has_ssn"): parts.append("Has SSN")
+        if q.get("has_itin"): parts.append("Has ITIN")
+        if q.get("num_dependents", 0) > 0: parts.append(f"{q['num_dependents']} dependent(s)")
+        if q.get("immigration_statuses"): parts.append(f"Immigration status: {', '.join(q['immigration_statuses'])}")
+        
+        if parts:
+            profile_summary = "User Profile Data:\n- " + "\n- ".join(parts) + "\n"
+            
+        # Call the Native GNN Service
+        try:
+            gnn_preds = gnn_service.predict_for_profile(q)
+            if gnn_preds:
+                profile_summary += "\n" + gnn_preds
+        except Exception as e:
+            print(f"GNN skipped: {e}")
+
+    return profile_summary
+
 
 
 class ChatRequest(BaseModel):
@@ -126,6 +169,13 @@ async def chat(
             yield json.dumps({"type": "meta", "chat_id": chat_id}) + "\n"
             yield json.dumps({"type": "sources", "sources": sources}) + "\n"
             
+            # Emit GNN status FIRST before blocking to run inference
+            yield json.dumps({"type": "status", "stage": "calling_gnn"}) + "\n"
+            await asyncio.sleep(0.1) # small flush tick
+
+            # Build profile summary and run GNN (this blocks for ~100-300ms)
+            profile_summary = build_profile_summary(user_id, db)
+            
             full_answer = ""
             async for event in stream_document_chat(
                 question=req.question,
@@ -133,11 +183,13 @@ async def chat(
                 language_code=req.language,
                 is_summary=False,
                 db=db,
-                document_id=req.document_id
+                document_id=req.document_id,
+                profile_summary=profile_summary
             ):
                 if event["type"] == "answer_token":
                     full_answer += event["text"]
                 yield json.dumps(event) + "\n"
+
 
             # 6) Store assistant message at end
             db.table("chat_messages").insert(
@@ -157,34 +209,8 @@ async def chat(
     # Keep this non-streaming general response for simple clients.
     # (Your richer streaming+images flow is handled by POST /chat/general)
 
-    # 1) Build profile summary from questionnaire (if available)
-    profile_summary = ""
-    q_res = (
-        db.table("questionnaires")
-        .select(
-            "filing_status, residency_status, visa_type, income_sources, "
-            "states_worked, has_ssn, has_itin, num_dependents, immigration_statuses"
-        )
-        .eq("user_id", user_id)
-        .order("filing_year", desc=True)
-        .limit(1)
-        .maybe_single()
-        .execute()
-    )
-    if q_res.data:
-        q = q_res.data
-        parts = []
-        if q.get("filing_status"): parts.append(f"Filing status: {q['filing_status']}")
-        if q.get("residency_status"): parts.append(f"Residency: {q['residency_status']}")
-        if q.get("visa_type"): parts.append(f"Visa type: {q['visa_type']}")
-        if q.get("income_sources"): parts.append(f"Income sources: {', '.join(q['income_sources'])}")
-        if q.get("states_worked"): parts.append(f"States worked: {', '.join(q['states_worked'])}")
-        if q.get("has_ssn"): parts.append("Has SSN")
-        if q.get("has_itin"): parts.append("Has ITIN")
-        if q.get("num_dependents", 0) > 0: parts.append(f"{q['num_dependents']} dependent(s)")
-        if q.get("immigration_statuses"): parts.append(f"Immigration status: {', '.join(q['immigration_statuses'])}")
-        if parts:
-            profile_summary = "\n".join(parts)
+    # 1) Build profile summary from questionnaire and run GNN
+    profile_summary = build_profile_summary(user_id, db)
 
     # 2) Get or create chat session (document_id = NULL)
     if req.chat_id:
@@ -296,35 +322,6 @@ async def general_chat(
         }
     ).execute()
 
-    # 3) Build profile summary from questionnaire (if available)
-    profile_summary = ""
-    q_res = (
-        db.table("questionnaires")
-        .select(
-            "filing_status, residency_status, visa_type, income_sources, "
-            "states_worked, has_ssn, has_itin, num_dependents, immigration_statuses"
-        )
-        .eq("user_id", user_id)
-        .order("filing_year", desc=True)
-        .limit(1)
-        .maybe_single()
-        .execute()
-    )
-    if q_res.data:
-        q = q_res.data
-        parts = []
-        if q.get("filing_status"): parts.append(f"Filing status: {q['filing_status']}")
-        if q.get("residency_status"): parts.append(f"Residency: {q['residency_status']}")
-        if q.get("visa_type"): parts.append(f"Visa type: {q['visa_type']}")
-        if q.get("income_sources"): parts.append(f"Income sources: {', '.join(q['income_sources'])}")
-        if q.get("states_worked"): parts.append(f"States worked: {', '.join(q['states_worked'])}")
-        if q.get("has_ssn"): parts.append("Has SSN")
-        if q.get("has_itin"): parts.append("Has ITIN")
-        if q.get("num_dependents", 0) > 0: parts.append(f"{q['num_dependents']} dependent(s)")
-        if q.get("immigration_statuses"): parts.append(f"Immigration status: {', '.join(q['immigration_statuses'])}")
-        if parts:
-            profile_summary = "\n".join(parts)
-
     # 3.5) Fetch chat history (last 10 messages)
     chat_history = []
     if req.chat_id:
@@ -346,6 +343,15 @@ async def general_chat(
     async def generate():
         # First chunk: send chat_id and meta in NDJSON
         yield json.dumps({"type": "meta", "chat_id": chat_id}) + "\n"
+        
+        # Emit GNN status FIRST before blocking to run inference
+        yield json.dumps({"type": "thinking", "status": "start"}) + "\n" # Open the bubble
+        yield json.dumps({"type": "status_update", "status": "thinking"}) + "\n" # Ensure thinking state
+        yield json.dumps({"type": "status", "stage": "calling_gnn"}) + "\n"
+        await asyncio.sleep(0.1) # flush
+        
+        # Build profile summary and run GNN (this blocks for ~100-300ms)
+        profile_summary = build_profile_summary(user_id, db)
 
         full_answer = ""
         plan_text = ""
