@@ -126,11 +126,14 @@ export function GeneralChatInterface({
         content: "",
         lang: language,
         sources: [],
+        isThinking: true,
+        hasPlan: false,
+        status: "thinking",
+        thinkingStartTime: Date.now(),
         created_at: new Date().toISOString(),
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
-      setLoading(false); // Stop the dot loader once stream begins
 
       let done = false;
       let buffer = "";
@@ -140,24 +143,65 @@ export function GeneralChatInterface({
         done = readerDone;
         if (value) {
           buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
+          const lines = buffer.split("\n");
           buffer = lines.pop() || ""; // retain incomplete line
 
           for (const line of lines) {
             if (!line.trim()) continue;
             try {
               const data = JSON.parse(line);
-              if (data.chat_id) {
+
+              if (data.type === "meta" && data.chat_id) {
                 if (!chatId) setChatId(data.chat_id);
                 assistantMessage.chat_id = data.chat_id;
               }
-              if (data.text) {
-                assistantMessage.content += data.text;
-                // update the specific message in the react state
-                setMessages((prev) =>
-                  prev.map(m => m.id === assistantMessage.id ? { ...assistantMessage } : m)
-                );
+
+              if (data.type === "thinking") {
+                const isStart = data.status === "start";
+                assistantMessage.isThinking = isStart;
+                if (!isStart && assistantMessage.thinkingStartTime) {
+                  assistantMessage.thinkingDuration = Math.round((Date.now() - assistantMessage.thinkingStartTime) / 1000);
+                }
               }
+
+              if (data.type === "status_update") {
+                if (data.status === "responding") {
+                  assistantMessage.status = "responding";
+                  assistantMessage.isThinking = false;
+                  // Ensure duration is set if thinking ended via transition
+                  if (!assistantMessage.thinkingDuration && assistantMessage.thinkingStartTime) {
+                    assistantMessage.thinkingDuration = Math.round((Date.now() - assistantMessage.thinkingStartTime) / 1000);
+                  }
+                }
+              }
+
+              if (data.type === "plan_token") {
+                assistantMessage.plan = (assistantMessage.plan || "") + data.text;
+                assistantMessage.hasPlan = true;
+              }
+
+              if (data.type === "answer_token") {
+                if (assistantMessage.status === "thinking") {
+                  assistantMessage.status = "responding";
+                  assistantMessage.isThinking = false;
+                  if (assistantMessage.thinkingStartTime && !assistantMessage.thinkingDuration) {
+                    assistantMessage.thinkingDuration = Math.round((Date.now() - assistantMessage.thinkingStartTime) / 1000);
+                  }
+                }
+                assistantMessage.content += data.text;
+              }
+
+              if (data.type === "done") {
+                assistantMessage.status = "done";
+                done = true;
+              }
+
+              // Update the specific message in the react state
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMessage.id ? { ...assistantMessage } : m
+                )
+              );
             } catch (e) {
               console.error("Parse error on chunk:", line, e);
             }
@@ -292,26 +336,7 @@ export function GeneralChatInterface({
         {messages.map((msg) => (
           <MessageBubble key={msg.id} message={msg} />
         ))}
-        {loading && (
-          <div className="flex justify-start">
-            <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
-              <div className="flex gap-1">
-                <span
-                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                  style={{ animationDelay: "0ms" }}
-                />
-                <span
-                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                  style={{ animationDelay: "150ms" }}
-                />
-                <span
-                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                  style={{ animationDelay: "300ms" }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
+
         <div ref={bottomRef} />
       </div>
 

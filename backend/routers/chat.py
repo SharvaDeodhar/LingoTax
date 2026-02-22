@@ -328,27 +328,28 @@ async def general_chat(
 
     # 4) Generate answer with streaming and profile context
     async def generate():
-        # First chunk: send chat_id in case it's new
-        yield json.dumps({"chat_id": chat_id}) + "\n"
+        # First chunk: send chat_id and meta in NDJSON
+        yield json.dumps({"type": "meta", "chat_id": chat_id}) + "\n"
 
         full_answer = ""
-        async for chunk in stream_general_tax_question(
+        plan_text = ""
+
+        async for event in stream_general_tax_question(
             question=req.question,
             language_code=req.language,
             profile_summary=profile_summary,
             chat_history=chat_history,
             images=req.images,
         ):
-            full_answer += chunk
+            if event["type"] == "plan":
+                plan_text = event["text"]
+            elif event["type"] == "answer_token":
+                full_answer += event["text"]
 
-            # Typewriter-ish streaming: split into tokens
-            import re
-            tokens = re.split(r"(\s+)", chunk)
-            for token in tokens:
-                if not token:
-                    continue
-                yield json.dumps({"text": token}) + "\n"
-                await asyncio.sleep(0.02)
+            yield json.dumps(event) + "\n"
+            # Small delay for typewriter effect on answer tokens
+            if event["type"] == "answer_token":
+                await asyncio.sleep(0.05)
 
         # 5) Store assistant message at end
         db.table("chat_messages").insert(
@@ -359,6 +360,7 @@ async def general_chat(
                 "content": full_answer,
                 "lang": req.language,
                 "sources": [],
+                "metadata": {"plan": plan_text} if plan_text else {},
             }
         ).execute()
 

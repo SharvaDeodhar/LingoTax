@@ -305,6 +305,13 @@ export interface ChatMessage {
   lang: string;
   sources?: any[];
   images?: { data: string; mime_type: string }[];
+  plan?: string;
+  hasPlan?: boolean;
+  showPlan?: boolean;
+  isThinking?: boolean;
+  status?: "thinking" | "responding" | "done";
+  thinkingStartTime?: number;
+  thinkingDuration?: number;
   created_at: string;
 }
 
