@@ -133,6 +133,75 @@ _general_prompt = ChatPromptTemplate.from_messages(
 _general_chain = _general_prompt | _llm | StrOutputParser()
 
 
+_SUMMARY_SYSTEM_PROMPT = """\
+You are LingoTax, a friendly US tax assistant.
+The user's preferred language is {language}. You MUST respond entirely in {language}.
+
+You have been given the COMPLETE contents of the user's tax document. Provide a thorough,
+easy-to-understand breakdown so the user knows exactly what this document contains and
+what they need to do with it.
+
+Structure your response exactly as follows (translate ALL headings into {language}):
+
+**Document Type:**
+[Identify the form, e.g. W-2 Wage and Tax Statement, Form 1099-NEC, Form 1040, etc.]
+
+**What This Document Is:**
+[2-3 sentences explaining the purpose of this form in simple language]
+
+**Key Information Found:**
+[Bullet list of every important value: employer/payer name, EIN/SSN, dollar amounts by box/line, dates, states]
+
+**What You Need to Do:**
+[Numbered step-by-step instructions for using this document when filing taxes]
+
+**Anything to Watch Out For:**
+[Flag any unusual amounts, missing fields, or items that might need a CPA's attention]
+
+--- Complete document content ---
+{context}
+--- End of document ---\
+"""
+
+_summary_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", _SUMMARY_SYSTEM_PROMPT),
+        ("human", "Please summarize and break down this tax document for me."),
+    ]
+)
+
+_summary_chain = _summary_prompt | _llm | StrOutputParser()
+
+
+def summarize_document(
+    all_chunks: List[dict],
+    language_code: str = "en",
+) -> str:
+    """
+    Generate a comprehensive document breakdown using ALL chunks (no retrieval filtering).
+    Called automatically when a user first opens a document chat.
+
+    all_chunks: output of retrieve_all_chunks() — ordered by chunk_index
+    language_code: BCP-47 code, e.g. "es", "hi"
+    """
+    language_name = LANG_CODE_TO_NAME.get(language_code, "English")
+
+    context = "\n\n".join(
+        f"[Page {c['metadata'].get('page', '?')}]\n{c['chunk_text']}"
+        for c in all_chunks
+    )
+
+    if not context:
+        context = "No content could be extracted from this document."
+
+    return _summary_chain.invoke(
+        {
+            "context": context,
+            "language": language_name,
+        }
+    )
+
+
 def answer_general_question(
     question: str,
     language_code: str = "en",

@@ -21,12 +21,13 @@ export function ChatInterface({ document: doc, preferredLanguage }: ChatInterfac
   const [language, setLanguage] = useState(preferredLanguage);
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const supabase = getSupabaseBrowserClient();
 
-  // Load existing chat history
+  // Load existing chat history; auto-summarize on first open of a document chat
   useEffect(() => {
     async function loadHistory() {
       let query = supabase
@@ -42,18 +43,58 @@ export function ChatInterface({ document: doc, preferredLanguage }: ChatInterfac
       }
 
       const { data: chats } = await query;
-      if (!chats || chats.length === 0) return;
 
-      const existingChatId = chats[0].id;
-      setChatId(existingChatId);
+      if (chats && chats.length > 0) {
+        const existingChatId = chats[0].id;
+        setChatId(existingChatId);
 
-      const { data: msgs } = await supabase
-        .from("chat_messages")
-        .select("*")
-        .eq("chat_id", existingChatId)
-        .order("created_at", { ascending: true });
+        const { data: msgs } = await supabase
+          .from("chat_messages")
+          .select("*")
+          .eq("chat_id", existingChatId)
+          .order("created_at", { ascending: true });
 
-      setMessages((msgs as ChatMessage[]) ?? []);
+        const existing = (msgs as ChatMessage[]) ?? [];
+        setMessages(existing);
+
+        // If no messages yet (e.g. chat row exists but is empty), auto-summarize
+        if (doc && existing.length === 0) {
+          autoSummarize(existingChatId);
+        }
+      } else if (doc) {
+        // No chat session at all — auto-summarize will create one
+        autoSummarize(undefined);
+      }
+    }
+
+    async function autoSummarize(existingChatId: string | undefined) {
+      setSummarizing(true);
+      setError(null);
+      try {
+        const response = await sendChatMessage({
+          document_id: doc!.id,
+          chat_id: existingChatId,
+          question: "__summarize__",
+          language,
+        });
+        if (!chatId) setChatId(response.chat_id);
+        setMessages([
+          {
+            id: crypto.randomUUID(),
+            chat_id: response.chat_id,
+            user_id: "",
+            role: "assistant",
+            content: response.answer,
+            lang: language,
+            sources: [],
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Could not load document summary");
+      } finally {
+        setSummarizing(false);
+      }
     }
 
     loadHistory();
@@ -136,7 +177,7 @@ export function ChatInterface({ document: doc, preferredLanguage }: ChatInterfac
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-        {messages.length === 0 && (
+        {messages.length === 0 && !summarizing && (
           <div className="text-center py-12 text-muted-foreground">
             {isGeneralMode ? (
               <>
@@ -145,8 +186,8 @@ export function ChatInterface({ document: doc, preferredLanguage }: ChatInterfac
               </>
             ) : (
               <>
-                <p className="text-sm font-medium mb-2">Start chatting about your document</p>
-                <p className="text-xs">Try: &quot;What are my wages?&quot; or &quot;What is Box 2?&quot;</p>
+                <p className="text-sm font-medium mb-2">Analyzing your document…</p>
+                <p className="text-xs">Your document breakdown will appear shortly</p>
               </>
             )}
           </div>
@@ -154,13 +195,16 @@ export function ChatInterface({ document: doc, preferredLanguage }: ChatInterfac
         {messages.map((msg) => (
           <MessageBubble key={msg.id} message={msg} />
         ))}
-        {loading && (
+        {(loading || summarizing) && (
           <div className="flex justify-start">
             <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
-              <div className="flex gap-1">
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+              <div className="flex items-center gap-2">
+                {summarizing && <span className="text-xs text-muted-foreground">Reading document…</span>}
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                </div>
               </div>
             </div>
           </div>
@@ -183,16 +227,18 @@ export function ChatInterface({ document: doc, preferredLanguage }: ChatInterfac
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder={
-              isGeneralMode
+              summarizing
+                ? "Reading document…"
+                : isGeneralMode
                 ? "Ask a tax question…"
                 : "Ask about your document…"
             }
-            disabled={loading}
+            disabled={loading || summarizing}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={!question.trim() || loading}
+            disabled={!question.trim() || loading || summarizing}
             className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             <Send className="w-4 h-4" />

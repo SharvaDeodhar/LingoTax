@@ -13,8 +13,8 @@ from pydantic import BaseModel
 from supabase import Client
 
 from dependencies import get_current_user_id, get_user_supabase
-from rag.retriever import retrieve_chunks
-from rag.chain import answer_general_question, answer_question
+from rag.retriever import retrieve_all_chunks, retrieve_chunks
+from rag.chain import answer_general_question, answer_question, summarize_document
 
 router = APIRouter()
 
@@ -55,6 +55,41 @@ async def chat(
                 status_code=400,
                 detail=f"Document is not ready for chat (status: {doc.data['ingest_status']})",
             )
+
+        # ── Auto-summarize: triggered by frontend on first open ───────────────
+        if req.question == "__summarize__":
+            # Get or create chat session (no user message stored for auto-summary)
+            if req.chat_id:
+                chat_id = req.chat_id
+            else:
+                chat_result = (
+                    db.table("chats")
+                    .insert(
+                        {
+                            "user_id": user_id,
+                            "document_id": req.document_id,
+                            "title": "Document Summary",
+                        }
+                    )
+                    .execute()
+                )
+                chat_id = chat_result.data[0]["id"]
+
+            all_chunks = retrieve_all_chunks(db, req.document_id)
+            answer = summarize_document(all_chunks, language_code=req.language)
+
+            db.table("chat_messages").insert(
+                {
+                    "chat_id": chat_id,
+                    "user_id": user_id,
+                    "role": "assistant",
+                    "content": answer,
+                    "lang": req.language,
+                    "sources": [],
+                }
+            ).execute()
+
+            return ChatResponse(chat_id=chat_id, answer=answer, sources=[])
 
         # 2. Get or create chat session
         if req.chat_id:
