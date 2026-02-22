@@ -14,7 +14,11 @@ LingoTax is a world-class tax assistance platform designed specifically for the 
 ![LangChain](https://img.shields.io/badge/LangChain-1C3C3C?style=for-the-badge&logo=chainlink&logoColor=white)
 
 ---
+##Team Name:
+Anish n em
 
+## Team Members:
+Sharva Deodhar, Shirish Parasa, Anish Kajan, Tejas Naik
 ## 📖 Table of Contents
 - [The Problem](#the-problem)
 - [The Solution](#the-solution)
