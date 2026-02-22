@@ -8,7 +8,7 @@ export default function AuthLayout({
       <div className="w-full max-w-md">
         {/* Logo / brand */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-blue-600">LingoTax</h1>
+          <h1 className="text-3xl font-bold text-blue-600">LinguaTax</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Multilingual US tax assistant
           </p>

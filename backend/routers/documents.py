@@ -8,7 +8,7 @@ GET  /documents              – List user's documents
 
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from supabase import Client
 
@@ -115,15 +115,72 @@ async def get_signed_url(
     document_id: str,
     user_id: str = Depends(get_current_user_id),
     db: Client = Depends(get_user_supabase),
-    service_db: Client = Depends(get_service_supabase),
 ):
-    """Generate a temporary signed URL for viewing a PDF in the browser."""
-    doc = db.table("documents").select("storage_path").eq("id", document_id).maybe_single().execute()
+    """
+    Return a temporary signed URL (1 hour) for reading the PDF in-browser.
+    Ownership is verified through the RLS-enforced query.
+    """
+    doc = (
+        db.table("documents")
+        .select("storage_path")
+        .eq("id", document_id)
+        .maybe_single()
+        .execute()
+    )
     if not doc.data:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    signed_url = storage_service.create_signed_url(service_db, doc.data["storage_path"])
-    return {"signed_url": signed_url}
+    signed = storage_service.create_signed_url(
+        db, doc.data["storage_path"], expires_in=3600
+    )
+    return {"signed_url": signed}
+
+
+@router.post("/{document_id}/save-pdf")
+async def save_edited_pdf(
+    document_id: str,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user_id),
+    db: Client = Depends(get_user_supabase),
+    service_db: Client = Depends(get_service_supabase),
+):
+    """
+    Overwrite the stored PDF with a user-edited version.
+    After saving, re-triggers ingestion so RAG indexes reflect edits.
+    """
+    doc = db.table("documents").select("*").eq("id", document_id).maybe_single().execute()
+    if not doc.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    storage_path = doc.data["storage_path"]
+    file_bytes = await file.read()
+
+    # Overwrite in Supabase Storage (service role)
+    service_db.storage.from_("tax-docs").update(
+        storage_path,
+        file_bytes,
+        {"content-type": "application/pdf", "upsert": "true"},
+    )
+
+    # Update file size + mark as pending/processing will happen in pipeline
+    service_db.table("documents").update(
+        {"file_size_bytes": len(file_bytes)}
+    ).eq("id", document_id).execute()
+
+    # Clear old chunks so indexes reflect edits
+    service_db.table("document_chunks").delete().eq("document_id", document_id).execute()
+
+    # Re-trigger ingestion pipeline
+    background_tasks.add_task(
+        _run_ingestion_pipeline,
+        document_id=document_id,
+        user_id=user_id,
+        storage_path=storage_path,
+        service_db=service_db,
+    )
+
+    return {"status": "saved_and_reingesting", "document_id": document_id}
 
 
 # ─── Background ingestion pipeline ───────────────────────────────────────────

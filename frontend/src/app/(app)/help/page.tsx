@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
-import { ChatInterface } from "@/components/chat/ChatInterface";
+import { GeneralChatInterface } from "@/components/chat/GeneralChatInterface";
 import type { Profile } from "@/types";
 
 export default async function HelpPage() {
@@ -18,8 +18,7 @@ export default async function HelpPage() {
     .eq("user_id", user.id)
     .single();
 
-  const preferredLanguage =
-    (profile as Profile | null)?.preferred_language ?? "en";
+  const preferredLanguage = (profile as Profile | null)?.preferred_language ?? "en";
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
@@ -30,7 +29,7 @@ export default async function HelpPage() {
         </p>
       </div>
       <div className="flex-1 overflow-hidden">
-        <ChatInterface preferredLanguage={preferredLanguage} />
+        <GeneralChatInterface preferredLanguage={preferredLanguage} />
       </div>
     </div>
   );

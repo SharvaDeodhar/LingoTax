@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { CURRENT_FILING_YEAR } from "@/lib/constants";
+import { syncTasksFromQuestionnaire } from "@/lib/api/fastapi";
 import { SectionA } from "./steps/SectionA";
 import { SectionB } from "./steps/SectionB";
 import { SectionC } from "./steps/SectionC";
@@ -38,9 +39,7 @@ export type QuestionnaireMainData = Omit<
   "id" | "user_id" | "created_at" | "updated_at"
 >;
 
-function buildInitialData(
-  init?: Partial<Questionnaire>
-): QuestionnaireMainData {
+function buildInitialData(init?: Partial<Questionnaire>): QuestionnaireMainData {
   return {
     filing_year: init?.filing_year ?? CURRENT_FILING_YEAR,
     questionnaire_version: 2,
@@ -184,14 +183,14 @@ export function QuestionnaireForm({
         data.ssn_status === "yes"
           ? true
           : data.ssn_status === "no"
-            ? false
-            : data.has_ssn,
+          ? false
+          : data.has_ssn,
       has_itin:
         data.itin_status === "yes"
           ? true
           : data.itin_status === "no"
-            ? false
-            : data.has_itin,
+          ? false
+          : data.has_itin,
       num_dependents:
         dependents.length > 0 ? dependents.length : data.num_dependents,
       states_lived:
@@ -201,9 +200,10 @@ export function QuestionnaireForm({
     };
 
     // Ensure the profiles row exists — guards against trigger not firing at sign-up
-    await supabase
-      .from("profiles")
-      .upsert({ user_id: userId }, { onConflict: "user_id", ignoreDuplicates: true });
+    await supabase.from("profiles").upsert(
+      { user_id: userId },
+      { onConflict: "user_id", ignoreDuplicates: true }
+    );
 
     // Check if a questionnaire already exists for this user/year
     const { data: existing } = await supabase
@@ -221,6 +221,7 @@ export function QuestionnaireForm({
         .from("questionnaires")
         .update(syncedData)
         .eq("id", existing.id);
+
       if (updateErr) {
         setError(updateErr.message);
         setSaving(false);
@@ -234,6 +235,7 @@ export function QuestionnaireForm({
         .insert({ user_id: userId, ...syncedData })
         .select("id")
         .single();
+
       if (insertErr || !inserted) {
         setError(insertErr?.message ?? "Failed to save.");
         setSaving(false);
@@ -243,10 +245,22 @@ export function QuestionnaireForm({
     }
 
     await Promise.all([
-      supabase.from("questionnaire_dependents").delete().eq("questionnaire_id", qId),
-      supabase.from("questionnaire_immigration_history").delete().eq("questionnaire_id", qId),
-      supabase.from("questionnaire_state_residency").delete().eq("questionnaire_id", qId),
-      supabase.from("questionnaire_d5_income").delete().eq("questionnaire_id", qId),
+      supabase
+        .from("questionnaire_dependents")
+        .delete()
+        .eq("questionnaire_id", qId),
+      supabase
+        .from("questionnaire_immigration_history")
+        .delete()
+        .eq("questionnaire_id", qId),
+      supabase
+        .from("questionnaire_state_residency")
+        .delete()
+        .eq("questionnaire_id", qId),
+      supabase
+        .from("questionnaire_d5_income")
+        .delete()
+        .eq("questionnaire_id", qId),
     ]);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -254,49 +268,77 @@ export function QuestionnaireForm({
 
     if (dependents.length > 0) {
       inserts.push(
-        supabase.from("questionnaire_dependents").insert(
-          dependents.map((d, i) => ({
-            ...d, id: undefined, questionnaire_id: qId, user_id: userId, sort_order: i,
-          }))
-        ).then(() => null)
+        supabase
+          .from("questionnaire_dependents")
+          .insert(
+            dependents.map((d, i) => ({
+              ...d,
+              id: undefined,
+              questionnaire_id: qId,
+              user_id: userId,
+              sort_order: i,
+            }))
+          )
+          .then(() => null)
       );
     }
+
     if (immigrationHistory.length > 0) {
       inserts.push(
-        supabase.from("questionnaire_immigration_history").insert(
-          immigrationHistory.map((r, i) => ({
-            ...r, id: undefined, questionnaire_id: qId, user_id: userId, sort_order: i,
-          }))
-        ).then(() => null)
+        supabase
+          .from("questionnaire_immigration_history")
+          .insert(
+            immigrationHistory.map((r, i) => ({
+              ...r,
+              id: undefined,
+              questionnaire_id: qId,
+              user_id: userId,
+              sort_order: i,
+            }))
+          )
+          .then(() => null)
       );
     }
+
     if (stateResidency.length > 0) {
       inserts.push(
-        supabase.from("questionnaire_state_residency").insert(
-          stateResidency.map((r, i) => ({
-            ...r, id: undefined, questionnaire_id: qId, user_id: userId, sort_order: i,
-          }))
-        ).then(() => null)
+        supabase
+          .from("questionnaire_state_residency")
+          .insert(
+            stateResidency.map((r, i) => ({
+              ...r,
+              id: undefined,
+              questionnaire_id: qId,
+              user_id: userId,
+              sort_order: i,
+            }))
+          )
+          .then(() => null)
       );
     }
+
     const d5Rows = d5Income.filter((d) => d.flag !== null);
     if (d5Rows.length > 0) {
       inserts.push(
-        supabase.from("questionnaire_d5_income").insert(
-          d5Rows.map((d) => ({ ...d, questionnaire_id: qId, user_id: userId }))
-        ).then(() => null)
+        supabase
+          .from("questionnaire_d5_income")
+          .insert(d5Rows.map((d) => ({ ...d, questionnaire_id: qId, user_id: userId })))
+          .then(() => null)
       );
     }
 
     await Promise.all(inserts);
 
-    // Auto-generate tasks and form checklist from the questionnaire data
+    // After successfully saving the questionnaire, generate/update
+    // the personalized dashboard task list from these answers.
+    // NOTE: If your API wrapper expects an object payload, change this call to:
+    //   await syncTasksFromQuestionnaire({ filing_year: syncedData.filing_year });
     try {
-      const { generateTasks } = await import("@/lib/api/fastapi");
-      await generateTasks(syncedData.filing_year);
+      await syncTasksFromQuestionnaire(syncedData.filing_year);
     } catch (err) {
-      // Non-fatal: tasks can be regenerated later from the dashboard
-      console.error("Failed to generate tasks:", err);
+      // Non-fatal: if task sync fails, the user can still use the app;
+      // the dashboard will simply not be auto-populated for now.
+      console.error("Failed to sync tasks from questionnaire", err);
     }
 
     router.push("/dashboard");
@@ -329,25 +371,29 @@ export function QuestionnaireForm({
               className="flex flex-col items-center gap-0.5 px-1.5 py-1 rounded"
             >
               <div
-                className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${i < step
-                  ? "bg-blue-600 text-white"
-                  : i === step
+                className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                  i < step
+                    ? "bg-blue-600 text-white"
+                    : i === step
                     ? "bg-blue-100 border-2 border-blue-600 text-blue-700"
                     : "bg-gray-100 text-gray-400"
-                  }`}
+                }`}
               >
                 {s.key}
               </div>
               <span
-                className={`text-[10px] hidden sm:block ${i === step ? "text-blue-700 font-medium" : "text-muted-foreground"
-                  }`}
+                className={`text-[10px] hidden sm:block ${
+                  i === step ? "text-blue-700 font-medium" : "text-muted-foreground"
+                }`}
               >
                 {s.label}
               </span>
             </button>
             {i < STEPS.length - 1 && (
               <div
-                className={`w-3 h-0.5 mb-3 ${i < step ? "bg-blue-500" : "bg-gray-200"}`}
+                className={`w-3 h-0.5 mb-3 ${
+                  i < step ? "bg-blue-500" : "bg-gray-200"
+                }`}
               />
             )}
           </div>
@@ -401,7 +447,8 @@ export function QuestionnaireForm({
       </div>
 
       <p className="text-xs text-muted-foreground mt-3 text-center">
-        You can navigate between sections freely. Progress saves only when you click &ldquo;Save profile&rdquo;.
+        You can navigate between sections freely. Progress saves only when you
+        click &ldquo;Save profile&rdquo;.
       </p>
     </div>
   );

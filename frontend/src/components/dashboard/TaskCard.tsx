@@ -37,14 +37,12 @@ export function TaskCard({ task, onUpdated }: TaskCardProps) {
   const router = useRouter();
 
   async function cycleStatus(e: React.MouseEvent) {
-    // Prevent the card click from triggering navigation
     e.stopPropagation();
     setUpdating(true);
+
     const next = NEXT_STATUS[task.status];
-    await supabase
-      .from("tasks")
-      .update({ status: next })
-      .eq("id", task.id);
+    await supabase.from("tasks").update({ status: next }).eq("id", task.id);
+
     onUpdated();
     setUpdating(false);
   }
@@ -52,7 +50,9 @@ export function TaskCard({ task, onUpdated }: TaskCardProps) {
   async function handleDelete(e: React.MouseEvent) {
     e.stopPropagation();
     setDeleting(true);
+
     await supabase.from("tasks").delete().eq("id", task.id);
+
     onUpdated();
     setDeleting(false);
   }
@@ -82,7 +82,8 @@ export function TaskCard({ task, onUpdated }: TaskCardProps) {
       >
         {STATUS_ICONS[task.status]}
       </button>
-      <div className="min-w-0 flex-1">
+
+      <div className="min-w-0 flex-1 text-left">
         <p
           className={cn(
             "text-sm font-medium",
@@ -92,12 +93,16 @@ export function TaskCard({ task, onUpdated }: TaskCardProps) {
           {task.title}
         </p>
         {task.description && (
-          <p className="text-xs text-muted-foreground mt-0.5">{task.description}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {task.description}
+          </p>
         )}
       </div>
+
       {isClickable && (
         <ChevronRight className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
       )}
+
       <button
         onClick={handleDelete}
         disabled={deleting}

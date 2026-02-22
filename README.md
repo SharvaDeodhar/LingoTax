@@ -1,8 +1,8 @@
-# LingoTax
+# LinguaTax
 
 Tech Stack:
-![LingoTax Tech Stack:](/techstack.jpeg)
+![LinguaTax Tech Stack:](/techstack.jpeg)
 
 Flow Chart:
 
-![LingoTax Flow Chart:](/flowchart.jpeg)
+![LinguaTax Flow Chart:](/flowchart.jpeg)

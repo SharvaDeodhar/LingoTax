@@ -65,15 +65,19 @@ def get_current_user_id(
         parts = token.split(".")
         if len(parts) != 3:
             raise ValueError("not a JWT")
+
         # base64url-decode the payload segment (pad to a multiple of 4)
         payload_b64 = parts[1] + "=" * (-len(parts[1]) % 4)
         payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+
         user_id: str = payload.get("sub", "")
         if not user_id:
             raise ValueError("missing sub claim")
+
         exp = payload.get("exp")
         if exp and exp < time.time():
             raise ValueError("token expired")
+
         return user_id
     except (ValueError, KeyError, json.JSONDecodeError) as exc:
         raise HTTPException(

@@ -2,11 +2,14 @@
 Task recommendations and generation endpoints.
 Maps questionnaire answers to recommended tax forms and task lists.
 
-GET  /tasks/recommendations – Returns forms + tasks based on user's questionnaire
-POST /tasks/generate        – Persist auto-generated tasks + form checklist from questionnaire
+GET  /tasks/recommendations         – Returns forms + tasks based on user's questionnaire
+POST /tasks/sync_from_questionnaire – Persist auto-generated tasks + form checklist from questionnaire
 """
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from supabase import Client
 
 from dependencies import get_current_user_id, get_user_supabase
@@ -17,13 +20,13 @@ router = APIRouter()
 
 # income_source value → form codes that apply
 INCOME_TO_FORMS: dict = {
-    "w2":         ["W-2"],
-    "1099_nec":   ["1099-NEC", "Schedule C"],
-    "1099_int":   ["1099-INT"],
-    "1099_div":   ["1099-DIV"],
+    "w2":          ["W-2"],
+    "1099_nec":    ["1099-NEC", "Schedule C"],
+    "1099_int":    ["1099-INT"],
+    "1099_div":    ["1099-DIV"],
     "investments": ["1099-B", "Schedule D"],
-    "1098_t":     ["1098-T"],
-    "rental":     ["Schedule E"],
+    "1098_t":      ["1098-T"],
+    "rental":      ["Schedule E"],
 }
 
 # Visa types that require Form 8843
@@ -70,10 +73,8 @@ async def get_task_recommendations(
 
     q = q_res.data
 
-    # ── Build recommended form codes ──────────────────────────────────────────
+    # ── Recommended forms ─────────────────────────────────────────────────────
     recommended_codes = _get_recommended_form_codes(q)
-
-    # Fetch matching catalog entries
     forms_res = (
         db.table("forms_catalog")
         .select("*")
@@ -81,7 +82,7 @@ async def get_task_recommendations(
         .execute()
     )
 
-    # ── Build task list ───────────────────────────────────────────────────────
+    # ── Recommended tasks ─────────────────────────────────────────────────────
     tasks = _build_tasks(q)
 
     return {
@@ -91,34 +92,36 @@ async def get_task_recommendations(
     }
 
 
-# ─── Generate endpoint (persists tasks + form checklist) ─────────────────────
+# ─── Sync endpoint (persists tasks + form checklist) ─────────────────────────
 
-@router.post("/generate")
-async def generate_tasks(
-    filing_year: int = 2024,
+class SyncTasksRequest(BaseModel):
+    filing_year: int = 2024
+
+
+class SyncTasksResponse(BaseModel):
+    created: int
+    updated: int
+    deleted: int
+    checklist_count: int
+
+
+@router.post("/sync_from_questionnaire", response_model=SyncTasksResponse)
+async def sync_tasks_from_questionnaire(
+    payload: SyncTasksRequest,
     user_id: str = Depends(get_current_user_id),
     db: Client = Depends(get_user_supabase),
 ):
     """
-    Persist auto-generated tasks and form checklist from the user's questionnaire.
-    Deletes previously auto-generated tasks for idempotency, then inserts fresh ones.
+    Materialize questionnaire-driven task recommendations into the tasks table AND
+    refresh the user's form checklist.
+
+    - Uses the same recommendation engine as /tasks/recommendations
+    - Idempotent: re-running updates descriptions/order and prunes obsolete
+      auto-generated tasks without touching user-created tasks.
+    - Also refreshes user_form_checklist based on forms_catalog and questionnaire.
     """
-    return await _run_generate_tasks(filing_year, user_id, db)
+    filing_year = payload.filing_year
 
-
-@router.get("/debug_generate/{user_id}/{filing_year}")
-async def debug_generate_tasks(
-    user_id: str,
-    filing_year: int,
-    db: Client = Depends(get_user_supabase),
-):
-    # Pass the service role DB to bypass RLS for this debug endpoint
-    from dependencies import get_service_supabase
-    service_db = get_service_supabase()
-    return await _run_generate_tasks(filing_year, user_id, service_db)
-
-
-async def _run_generate_tasks(filing_year: int, user_id: str, db: Client):
     q_res = (
         db.table("questionnaires")
         .select("*")
@@ -129,50 +132,103 @@ async def _run_generate_tasks(filing_year: int, user_id: str, db: Client):
     )
 
     if not q_res.data:
-        raise HTTPException(status_code=404, detail="No questionnaire found for this filing year.")
+        raise HTTPException(
+            status_code=400,
+            detail="No questionnaire found for this filing year; complete your profile first.",
+        )
 
     q = q_res.data
 
-    # ── Look up task_groups by name ───────────────────────────────────────────
-    groups_res = db.table("task_groups").select("*").order("sort_order").execute()
-    group_by_name: dict = {}
-    for g in groups_res.data or []:
-        group_by_name[g["name"]] = g["id"]
+    # Build recommended task payloads from questionnaire
+    recommended_tasks = _build_tasks(q)
 
-    # ── Delete previous auto-generated tasks ──────────────────────────────────
-    db.table("tasks") \
-        .delete() \
-        .eq("user_id", user_id) \
-        .eq("filing_year", filing_year) \
-        .eq("auto_generated", True) \
+    # Load task groups so we can map group name → id
+    groups_res = db.table("task_groups").select("*").execute()
+    groups_by_name = {g["name"]: g for g in (groups_res.data or [])}
+
+    # Ensure all referenced groups exist
+    missing_groups = {t["group"] for t in recommended_tasks} - set(groups_by_name.keys())
+    if missing_groups:
+        insert_rows = [{"name": name, "sort_order": 99} for name in sorted(missing_groups)]
+        inserted = db.table("task_groups").insert(insert_rows).execute()
+        for g in inserted.data or []:
+            groups_by_name[g["name"]] = g
+
+    # Existing auto-generated tasks for this year/user (created from questionnaire)
+    existing_res = (
+        db.table("tasks")
+        .select("*")
+        .eq("user_id", user_id)
+        .eq("filing_year", filing_year)
+        .eq("source", "questionnaire")
         .execute()
+    )
+    existing_tasks = existing_res.data or []
 
-    # ── Build and persist tasks ───────────────────────────────────────────────
-    task_defs = _build_tasks(q)
-    task_rows = []
-    for i, t in enumerate(task_defs):
-        group_id = group_by_name.get(t["group"])
-        task_rows.append({
-            "user_id": user_id,
-            "task_group_id": group_id,
-            "title": t["title"],
-            "description": t.get("description"),
-            "form_code": t.get("form_code"),
-            "status": "not_started",
-            "filing_year": filing_year,
-            "sort_order": i,
-            "auto_generated": True,
-        })
+    # Key existing tasks by (group_name, title)
+    group_id_to_name = {g["id"]: g["name"] for g in groups_by_name.values()}
+    existing_by_key: dict[tuple[str, str], dict] = {}
+    for t in existing_tasks:
+        g_name = group_id_to_name.get(t.get("task_group_id"))
+        if g_name:
+            existing_by_key[(g_name, t["title"])] = t
 
-    inserted_tasks = []
-    if task_rows:
-        res = db.table("tasks").insert(task_rows).execute()
-        inserted_tasks = res.data or []
+    created = 0
+    updated = 0
+    kept_ids: set[str] = set()
 
-    # ── Build and persist form checklist ───────────────────────────────────────
+    # Upsert recommended tasks
+    for idx, rec in enumerate(recommended_tasks):
+        group_name = rec["group"]
+        group = groups_by_name.get(group_name)
+        if not group:
+            continue
+
+        key = (group_name, rec["title"])
+        existing = existing_by_key.get(key)
+
+        if existing:
+            db.table("tasks").update(
+                {
+                    "description": rec.get("description"),
+                    "form_code": rec.get("form_code"),
+                    "sort_order": idx,
+                    "task_group_id": group["id"],
+                    "questionnaire_id": q["id"],
+                    "auto_generated": True,
+                    "source": "questionnaire",
+                }
+            ).eq("id", existing["id"]).execute()
+            updated += 1
+            kept_ids.add(existing["id"])
+        else:
+            db.table("tasks").insert(
+                {
+                    "user_id": user_id,
+                    "task_group_id": group["id"],
+                    "title": rec["title"],
+                    "description": rec.get("description"),
+                    "form_code": rec.get("form_code"),
+                    "status": "not_started",
+                    "filing_year": filing_year,
+                    "sort_order": idx,
+                    "questionnaire_id": q["id"],
+                    "auto_generated": True,
+                    "source": "questionnaire",
+                }
+            ).execute()
+            created += 1
+
+    # Delete any auto-generated tasks that are no longer recommended
+    obsolete_ids = [t["id"] for t in existing_tasks if t["id"] not in kept_ids]
+    deleted = 0
+    if obsolete_ids:
+        db.table("tasks").delete().in_("id", obsolete_ids).execute()
+        deleted = len(obsolete_ids)
+
+    # ── Refresh form checklist ────────────────────────────────────────────────
     recommended_codes = _get_recommended_form_codes(q)
 
-    # Fetch matching catalog entries
     forms_res = (
         db.table("forms_catalog")
         .select("*")
@@ -181,32 +237,34 @@ async def _run_generate_tasks(filing_year: int, user_id: str, db: Client):
     )
     catalog_forms = forms_res.data or []
 
-    # Delete existing checklist for this user+year, then insert fresh
+    # Clear existing checklist for this user+year, then insert fresh
     db.table("user_form_checklist") \
         .delete() \
         .eq("user_id", user_id) \
         .eq("filing_year", filing_year) \
         .execute()
 
-    checklist_rows = []
-    for form in catalog_forms:
-        checklist_rows.append({
+    checklist_rows = [
+        {
             "user_id": user_id,
             "form_id": form["id"],
             "filing_year": filing_year,
             "status": "pending",
-        })
+        }
+        for form in catalog_forms
+    ]
 
-    inserted_checklist = []
+    checklist_count = 0
     if checklist_rows:
-        res = db.table("user_form_checklist").insert(checklist_rows).execute()
-        inserted_checklist = res.data or []
+        inserted = db.table("user_form_checklist").insert(checklist_rows).execute()
+        checklist_count = len(inserted.data or [])
 
-    return {
-        "tasks": inserted_tasks,
-        "form_checklist": inserted_checklist,
-        "recommended_forms": catalog_forms,
-    }
+    return SyncTasksResponse(
+        created=created,
+        updated=updated,
+        deleted=deleted,
+        checklist_count=checklist_count,
+    )
 
 
 # ─── Shared helpers ──────────────────────────────────────────────────────────
@@ -265,7 +323,6 @@ def _build_tasks(q: dict) -> list:
     # Tax Forms group — one task per recommended form
     income_sources = q.get("income_sources") or []
 
-    # W-2 tasks
     if "w2" in income_sources:
         tasks.append({
             "group": "Tax Forms",
@@ -274,7 +331,6 @@ def _build_tasks(q: dict) -> list:
             "form_code": "W-2",
         })
 
-    # 1099-NEC
     if "1099_nec" in income_sources:
         tasks.append({
             "group": "Tax Forms",
@@ -283,7 +339,6 @@ def _build_tasks(q: dict) -> list:
             "form_code": "1099-NEC",
         })
 
-    # 1099-INT
     if "1099_int" in income_sources:
         tasks.append({
             "group": "Tax Forms",
@@ -292,7 +347,6 @@ def _build_tasks(q: dict) -> list:
             "form_code": "1099-INT",
         })
 
-    # 1099-DIV
     if "1099_div" in income_sources:
         tasks.append({
             "group": "Tax Forms",
@@ -301,7 +355,6 @@ def _build_tasks(q: dict) -> list:
             "form_code": "1099-DIV",
         })
 
-    # Investments → 1099-B
     if "investments" in income_sources:
         tasks.append({
             "group": "Tax Forms",
@@ -310,7 +363,6 @@ def _build_tasks(q: dict) -> list:
             "form_code": "1099-B",
         })
 
-    # 1098-T
     if "1098_t" in income_sources:
         tasks.append({
             "group": "Tax Forms",
@@ -319,7 +371,6 @@ def _build_tasks(q: dict) -> list:
             "form_code": "1098-T",
         })
 
-    # Rental → Schedule E
     if "rental" in income_sources:
         tasks.append({
             "group": "Tax Forms",
