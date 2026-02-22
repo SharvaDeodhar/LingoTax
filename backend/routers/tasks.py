@@ -5,7 +5,8 @@ Maps questionnaire answers to recommended tax forms and task lists.
 GET /tasks/recommendations – Returns forms + tasks based on user's questionnaire
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from supabase import Client
 
 from dependencies import get_current_user_id, get_user_supabase
@@ -108,6 +109,147 @@ async def get_task_recommendations(
         "tasks": tasks,
         "questionnaire": q,
     }
+
+
+class SyncTasksRequest(BaseModel):
+    filing_year: int = 2024
+
+
+class SyncTasksResponse(BaseModel):
+    created: int
+    updated: int
+    deleted: int
+
+
+@router.post("/sync_from_questionnaire", response_model=SyncTasksResponse)
+async def sync_tasks_from_questionnaire(
+    payload: SyncTasksRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: Client = Depends(get_user_supabase),
+):
+    """
+    Materialize questionnaire-driven task recommendations into the tasks table.
+
+    - Uses the same recommendation engine as /tasks/recommendations
+    - Marks tasks as auto-generated and links them to the questionnaire row
+    - Idempotent: re-running will update descriptions/order and prune obsolete
+      auto-generated tasks without touching user-created tasks.
+    """
+    filing_year = payload.filing_year
+
+    q_res = (
+        db.table("questionnaires")
+        .select("*")
+        .eq("user_id", user_id)
+        .eq("filing_year", filing_year)
+        .maybe_single()
+        .execute()
+    )
+
+    if not q_res.data:
+        raise HTTPException(
+            status_code=400,
+            detail="No questionnaire found for this filing year; complete your profile first.",
+        )
+
+    q = q_res.data
+
+    # Build recommended task payloads from questionnaire
+    recommended = _build_tasks(q)
+
+    # Load task groups so we can map group name → id
+    groups_res = db.table("task_groups").select("*").execute()
+    groups_by_name = {g["name"]: g for g in (groups_res.data or [])}
+
+    # Ensure all referenced groups exist (defensive for custom groups)
+    missing_groups = {t["group"] for t in recommended} - set(groups_by_name.keys())
+    if missing_groups:
+        # Create any missing groups with a high sort_order so they appear last
+        insert_rows = [
+            {"name": name, "sort_order": 99} for name in sorted(missing_groups)
+        ]
+        if insert_rows:
+            inserted = db.table("task_groups").insert(insert_rows).execute()
+            for g in inserted.data or []:
+                groups_by_name[g["name"]] = g
+
+    # Existing auto-generated tasks for this year/user
+    existing_res = (
+        db.table("tasks")
+        .select("*")
+        .eq("user_id", user_id)
+        .eq("filing_year", filing_year)
+        .eq("source", "questionnaire")
+        .execute()
+    )
+    existing_tasks = existing_res.data or []
+
+    # Key existing tasks by (group_name, title)
+    existing_by_key: dict[tuple[str, str], dict] = {}
+    for t in existing_tasks:
+        group = next(
+            (g_name for g_name, g in groups_by_name.items() if g["id"] == t.get("task_group_id")),
+            None,
+        )
+        if group:
+            existing_by_key[(group, t["title"])] = t
+
+    created = 0
+    updated = 0
+    kept_ids: set[str] = set()
+
+    # Upsert recommended tasks
+    for idx, rec in enumerate(recommended):
+        group_name = rec["group"]
+        group = groups_by_name.get(group_name)
+        if not group:
+            # Should not happen due to earlier seeding, but skip defensively
+            continue
+
+        key = (group_name, rec["title"])
+        existing = existing_by_key.get(key)
+
+        if existing:
+            # Update description / sort_order if needed
+            db.table("tasks").update(
+                {
+                    "description": rec.get("description"),
+                    "sort_order": idx,
+                    "task_group_id": group["id"],
+                    "questionnaire_id": q["id"],
+                    "auto_generated": True,
+                    "source": "questionnaire",
+                }
+            ).eq("id", existing["id"]).execute()
+            updated += 1
+            kept_ids.add(existing["id"])
+        else:
+            db.table("tasks").insert(
+                {
+                    "user_id": user_id,
+                    "task_group_id": group["id"],
+                    "title": rec["title"],
+                    "description": rec.get("description"),
+                    "status": "not_started",
+                    "filing_year": filing_year,
+                    "sort_order": idx,
+                    "questionnaire_id": q["id"],
+                    "auto_generated": True,
+                    "source": "questionnaire",
+                }
+            ).execute()
+            created += 1
+
+    # Delete any auto-generated tasks that are no longer recommended
+    obsolete_ids = [
+        t["id"] for t in existing_tasks if t["id"] not in kept_ids
+    ]
+    deleted = 0
+    if obsolete_ids:
+        db.table("tasks").delete().in_("id", obsolete_ids).execute()
+        deleted = len(obsolete_ids)
+
+    return SyncTasksResponse(created=created, updated=updated, deleted=deleted)
 
 
 def _build_tasks(q: dict) -> list:

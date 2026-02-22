@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle2, Circle, Clock } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
 export function TaskCard({ task, onUpdated }: TaskCardProps) {
   const [updating, setUpdating] = useState(false);
   const supabase = getSupabaseBrowserClient();
+  const router = useRouter();
 
   async function cycleStatus() {
     setUpdating(true);
@@ -61,7 +63,11 @@ export function TaskCard({ task, onUpdated }: TaskCardProps) {
       >
         {STATUS_ICONS[task.status]}
       </button>
-      <div className="min-w-0 flex-1">
+      <button
+        type="button"
+        onClick={() => router.push(`/tasks/${task.id}`)}
+        className="min-w-0 flex-1 text-left"
+      >
         <p
           className={cn(
             "text-sm font-medium",
@@ -71,9 +77,11 @@ export function TaskCard({ task, onUpdated }: TaskCardProps) {
           {task.title}
         </p>
         {task.description && (
-          <p className="text-xs text-muted-foreground mt-0.5">{task.description}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {task.description}
+          </p>
         )}
-      </div>
+      </button>
     </div>
   );
 }

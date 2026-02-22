@@ -2,14 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Files, User, Settings } from "lucide-react";
+import Image from "next/image";
+import {
+  LayoutDashboard,
+  Files,
+  Bot,
+  User,
+  Settings,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/files",     label: "Files",     icon: Files },
-  { href: "/profile",   label: "Profile",   icon: User },
-  { href: "/settings",  label: "Settings",  icon: Settings },
+  { href: "/files", label: "Files", icon: Files },
+  { href: "/help", label: "AI Chat", icon: Bot },
+  { href: "/profile", label: "Profile", icon: User },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar() {
@@ -18,8 +26,9 @@ export function Sidebar() {
   return (
     <aside className="w-56 shrink-0 bg-white border-r flex flex-col">
       {/* Brand */}
-      <div className="px-5 py-4 border-b">
-        <span className="text-lg font-bold text-blue-600">LingoTax</span>
+      <div className="px-5 py-4 border-b flex items-center gap-2">
+        <Image src="/favicon/favicon-32x32.png" alt="Logo" width={24} height={24} />
+        <span className="text-lg font-bold text-blue-600">LinguaTax</span>
       </div>
 
       {/* Navigation */}

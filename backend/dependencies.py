@@ -64,7 +64,11 @@ def get_current_user_id(
             token,
             key="",  # not used when verify_signature=False
             algorithms=["HS256"],
-            options={"verify_signature": False, "verify_exp": True},
+            options={
+                "verify_signature": False, 
+                "verify_exp": True,
+                "verify_aud": False,
+            },
         )
         user_id: str = payload.get("sub", "")
         if not user_id:

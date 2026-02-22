@@ -224,6 +224,25 @@ export interface Task {
   task_groups?: TaskGroup;
 }
 
+// Document-linked task progress
+
+export type TaskDocumentStatus =
+  | "not_started"
+  | "uploaded"
+  | "in_progress"
+  | "completed";
+
+export interface TaskDocument {
+  id: string;
+  user_id: string;
+  task_id: string;
+  document_id: string;
+  status: TaskDocumentStatus;
+  progress_data: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
 // ─── Forms ────────────────────────────────────────────────────────────────────
 
 export type FormChecklistStatus = "pending" | "received" | "filed";
@@ -280,8 +299,9 @@ export interface ChatMessage {
   user_id: string;
   role: "user" | "assistant";
   content: string;
-  lang: string | null;
-  sources: ChunkSource[];
+  lang: string;
+  sources?: any[];
+  images?: { data: string; mime_type: string }[];
   created_at: string;
 }
 

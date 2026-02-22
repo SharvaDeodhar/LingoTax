@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { CURRENT_FILING_YEAR } from "@/lib/constants";
+import { syncTasksFromQuestionnaire } from "@/lib/api/fastapi";
 import { SectionA } from "./steps/SectionA";
 import { SectionB } from "./steps/SectionB";
 import { SectionC } from "./steps/SectionC";
@@ -289,6 +290,17 @@ export function QuestionnaireForm({
     }
 
     await Promise.all(inserts);
+
+    // After successfully saving the questionnaire, generate/update
+    // the personalized dashboard task list from these answers.
+    try {
+      await syncTasksFromQuestionnaire(syncedData.filing_year);
+    } catch (err) {
+      // Non-fatal: if task sync fails, the user can still use the app;
+      // the dashboard will simply not be auto-populated for now.
+      console.error("Failed to sync tasks from questionnaire", err);
+    }
+
     router.push("/dashboard");
   }
 

@@ -9,8 +9,9 @@ The system prompt instructs Gemini to:
 from typing import List
 
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.prompts import ChatPromptTemplate
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.messages import HumanMessage, AIMessage
 
 from config import settings
 
@@ -38,7 +39,7 @@ LANG_CODE_TO_NAME: dict = {
 }
 
 _SYSTEM_PROMPT = """\
-You are LingoTax, a friendly and knowledgeable US tax assistant.
+You are LinguaTax, a friendly and knowledgeable US tax assistant.
 The user's preferred language is {language}. You MUST respond entirely in {language}.
 
 You have been provided with excerpts from the user's tax document.
@@ -64,7 +65,7 @@ and suggest the user check the relevant section of the form directly.
 """
 
 _llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash",
+    model="gemini-2.5-flash",
     google_api_key=settings.gemini_api_key,
     temperature=0.2,
     max_output_tokens=2048,
@@ -78,6 +79,40 @@ _prompt = ChatPromptTemplate.from_messages(
 )
 
 _rag_chain = _prompt | _llm | StrOutputParser()
+
+
+_GENERAL_SYSTEM_PROMPT = """\
+You are LinguaTax, a friendly and knowledgeable US tax assistant.
+The user's preferred language is {language}. You MUST respond entirely in {language}.
+
+The user is asking general questions about US taxes and filing.
+
+{profile_context}
+
+Your goals:
+- Explain tax concepts in clear, simple {language}, avoiding legalese.
+- Preserve important tax form names and technical terms in English in parentheses.
+- Provide practical, step-by-step guidance tailored to individuals (not businesses unless asked).
+- If the question is about a specific US tax form (like W-2, 1040, 1099-INT, 1099-NEC, 1098-T),
+  explain what the form is for, what the key boxes/lines mean, and how it usually flows into a return.
+- If profile context is provided, tailor your advice to the user's specific situation (e.g. visa type,
+  income sources, filing status).
+
+Safety and scope:
+- You are not a CPA or tax attorney; include a short reminder that this is general educational guidance,
+  not personalized legal or tax advice, especially for high-stakes or ambiguous questions.
+- If you are unsure or the answer depends heavily on details you do not have, say so clearly and suggest
+  what additional information a tax professional or IRS resource would need.
+"""
+
+_general_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", _GENERAL_SYSTEM_PROMPT),
+        MessagesPlaceholder(variable_name="chat_history"),
+    ]
+)
+
+_general_chain = _general_prompt | _llm | StrOutputParser()
 
 
 def answer_question(
@@ -107,6 +142,151 @@ def answer_question(
     return _rag_chain.invoke(
         {
             "question": question,
+            "context": context,
+            "language": language_name,
+        }
+    )
+
+
+def answer_general_tax_question(
+    question: str,
+    language_code: str = "en",
+    profile_summary: str = "",
+    chat_history: list = None,
+    images: list = None,
+) -> str:
+    """
+    Generate a multilingual answer for general tax questions (no document context).
+    Optionally includes a summary of the user's tax profile for personalized advice.
+    """
+    language_name = LANG_CODE_TO_NAME.get(language_code, "English")
+
+    profile_context = ""
+    if profile_summary:
+        profile_context = f"""Here is what we know about this user's tax situation:
+{profile_summary}
+Use this context to give more specific and relevant advice."""
+
+    if chat_history is None:
+        chat_history = []
+
+    msg_content = [{"type": "text", "text": question}]
+    for img in (images or []):
+        msg_content.append(
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:{img['mime_type']};base64,{img['data']}"},
+            }
+        )
+    chat_history.append(HumanMessage(content=msg_content))
+
+    return _general_chain.invoke(
+        {
+            "language": language_name,
+            "profile_context": profile_context,
+            "chat_history": chat_history,
+        }
+    )
+
+async def stream_general_tax_question(
+    question: str,
+    language_code: str = "en",
+    profile_summary: str = "",
+    chat_history: list = None,
+    images: list = None,
+):
+    """
+    Generate an async streaming response for general tax questions.
+    """
+    language_name = LANG_CODE_TO_NAME.get(language_code, "English")
+
+    profile_context = ""
+    if profile_summary:
+        profile_context = f"""Here is what we know about this user's tax situation:
+{profile_summary}
+Use this context to give more specific and relevant advice."""
+
+    if chat_history is None:
+        chat_history = []
+
+    msg_content = [{"type": "text", "text": question}]
+    for img in (images or []):
+        msg_content.append(
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:{img['mime_type']};base64,{img['data']}"},
+            }
+        )
+    chat_history.append(HumanMessage(content=msg_content))
+
+    async for chunk in _general_chain.astream(
+        {
+            "language": language_name,
+            "profile_context": profile_context,
+            "chat_history": chat_history,
+        }
+    ):
+        yield chunk
+
+
+# ─── Document section summarization ──────────────────────────────────────────
+
+_SUMMARIZE_SYSTEM_PROMPT = """\
+You are LinguaTax, a multilingual US tax assistant.
+The user's preferred language is {language}. You MUST respond entirely in {language}.
+
+You are given the full text content of a tax document. Your task is to produce a
+clear, structured, section-by-section summary of this document.
+
+For each section or area of the form:
+1. State the section name / box number in English
+2. Explain what it means in simple {language}
+3. State the value found in the document (if any)
+4. Explain what the user should do with this information on their tax return
+
+Format your response with clear headings and bullet points.
+If this is a standard IRS form (W-2, 1099, 1040, etc.), organize by the form's
+official box/section structure.
+
+Keep the summary practical and actionable.
+
+--- Document content ---
+{context}
+--- End of content ---\
+"""
+
+_summarize_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", _SUMMARIZE_SYSTEM_PROMPT),
+        ("human", "Please summarize this tax document section by section in {language}."),
+    ]
+)
+
+_summarize_chain = _summarize_prompt | _llm | StrOutputParser()
+
+
+def summarize_document_sections(
+    chunks: List[dict],
+    language_code: str = "en",
+) -> str:
+    """
+    Produce a structured section-by-section summary of a document
+    from its chunks. Uses all chunks for comprehensive coverage.
+    """
+    language_name = LANG_CODE_TO_NAME.get(language_code, "English")
+
+    context = "\n\n---\n\n".join(
+        [
+            f"[Page {c['metadata'].get('page', '?')}] {c['chunk_text']}"
+            for c in chunks
+        ]
+    )
+
+    if not context:
+        return f"No content found in this document to summarize."
+
+    return _summarize_chain.invoke(
+        {
             "context": context,
             "language": language_name,
         }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send } from "lucide-react";
+import { Send, Mic } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { sendChatMessage } from "@/lib/api/fastapi";
 import { MessageBubble } from "./MessageBubble";
@@ -11,16 +11,19 @@ import type { ChatMessage, Document } from "@/types";
 interface ChatInterfaceProps {
   document: Document;
   preferredLanguage: string;
+  autoSummarize?: boolean;
 }
 
-export function ChatInterface({ document: doc, preferredLanguage }: ChatInterfaceProps) {
+export function ChatInterface({ document, preferredLanguage, autoSummarize = false }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatId, setChatId] = useState<string | undefined>();
   const [language, setLanguage] = useState(preferredLanguage);
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isListening, setIsListening] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   const supabase = getSupabaseBrowserClient();
 
@@ -30,7 +33,7 @@ export function ChatInterface({ document: doc, preferredLanguage }: ChatInterfac
       const { data: chats } = await supabase
         .from("chats")
         .select("id")
-        .eq("document_id", doc.id)
+        .eq("document_id", document.id)
         .order("created_at", { ascending: false })
         .limit(1);
 
@@ -49,7 +52,7 @@ export function ChatInterface({ document: doc, preferredLanguage }: ChatInterfac
     }
 
     loadHistory();
-  }, [doc.id, supabase]);
+  }, [document.id, supabase]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -78,7 +81,7 @@ export function ChatInterface({ document: doc, preferredLanguage }: ChatInterfac
 
     try {
       const response = await sendChatMessage({
-        document_id: doc.id,
+        document_id: document.id,
         chat_id: chatId,
         question: userMessage.content,
         language,
@@ -105,12 +108,60 @@ export function ChatInterface({ document: doc, preferredLanguage }: ChatInterfac
     }
   }
 
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      // @ts-ignore
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        setError("Speech recognition is not supported in this browser.");
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = language === "en" ? "en-US" : language;
+      recognition.interimResults = true;
+      recognition.continuous = true;
+
+      recognition.onresult = (event: any) => {
+        let currentTranscript = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          currentTranscript += event.results[i][0].transcript;
+        }
+        setQuestion(currentTranscript);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error", event.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.start();
+      recognitionRef.current = recognition;
+      setIsListening(true);
+      setError(null);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to start speech recognition.");
+      setIsListening(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-white">
         <div>
-          <p className="text-sm font-medium truncate max-w-[250px]">{doc.filename}</p>
+          <p className="text-sm font-medium truncate max-w-[250px]">{document.filename}</p>
           <p className="text-xs text-muted-foreground">Ask anything about this document</p>
         </div>
         <LanguageSelector value={language} onChange={setLanguage} />
@@ -150,18 +201,28 @@ export function ChatInterface({ document: doc, preferredLanguage }: ChatInterfac
 
       {/* Input */}
       <form onSubmit={handleSend} className="border-t bg-white p-4">
-        <div className="flex gap-2">
+        <div className="flex gap-2 relative">
           <input
             type="text"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Ask about your document…"
-            disabled={loading}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            placeholder={isListening ? "Listening..." : "Ask about your document…"}
+            disabled={loading || isListening}
+            className="flex-1 pl-3 pr-10 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
           />
           <button
+            type="button"
+            onClick={toggleListening}
+            disabled={loading}
+            className={`absolute right-12 top-1.5 p-1.5 rounded-md transition-colors ${isListening ? "text-red-600 bg-red-100 animate-pulse" : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              } disabled:opacity-50`}
+            title={isListening ? "Stop listening" : "Start dictating"}
+          >
+            <Mic className="w-4 h-4" />
+          </button>
+          <button
             type="submit"
-            disabled={!question.trim() || loading}
+            disabled={!question.trim() || loading || isListening}
             className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             <Send className="w-4 h-4" />

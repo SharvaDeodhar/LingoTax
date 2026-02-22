@@ -6,14 +6,17 @@ import { Upload } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { createDocument, ingestDocument } from "@/lib/api/fastapi";
 import { CURRENT_FILING_YEAR } from "@/lib/constants";
+import type { Document } from "@/types";
 
 interface FileUploadZoneProps {
   onUploadComplete: () => void;
+  onDocumentRegistered?: (doc: Document) => void;
   filingYear?: number;
 }
 
 export function FileUploadZone({
   onUploadComplete,
+  onDocumentRegistered,
   filingYear = CURRENT_FILING_YEAR,
 }: FileUploadZoneProps) {
   const [uploading, setUploading] = useState(false);
@@ -63,6 +66,7 @@ export function FileUploadZone({
         await ingestDocument(doc.id);
 
         setProgress(null);
+        onDocumentRegistered?.(doc);
         onUploadComplete();
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Upload failed");
@@ -71,7 +75,7 @@ export function FileUploadZone({
         setProgress(null);
       }
     },
-    [filingYear, onUploadComplete]
+    [filingYear, onDocumentRegistered, onUploadComplete]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -85,13 +89,12 @@ export function FileUploadZone({
     <div>
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors ${
-          isDragActive
+        className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors ${isDragActive
             ? "border-blue-500 bg-blue-50"
             : uploading
-            ? "border-gray-200 bg-gray-50 cursor-not-allowed"
-            : "border-gray-300 hover:border-gray-400 hover:bg-gray-50"
-        }`}
+              ? "border-gray-200 bg-gray-50 cursor-not-allowed"
+              : "border-gray-300 hover:border-gray-400 hover:bg-gray-50"
+          }`}
       >
         <input {...getInputProps()} />
         <Upload className="w-8 h-8 mx-auto text-gray-400 mb-3" />
