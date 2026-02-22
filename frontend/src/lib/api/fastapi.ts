@@ -32,6 +32,7 @@ export async function createDocument(payload: {
   mime_type: string;
   file_size_bytes: number;
   filing_year: number;
+  task_id?: string;
 }): Promise<Document> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${FASTAPI_URL}/documents/create`, {
@@ -65,10 +66,21 @@ export async function listDocuments(filingYear = 2024): Promise<Document[]> {
   return res.json();
 }
 
+export async function getDocumentSignedUrl(
+  documentId: string
+): Promise<{ signed_url: string }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${FASTAPI_URL}/documents/${documentId}/signed-url`, {
+    headers,
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 // ─── Chat ─────────────────────────────────────────────────────────────────────
 
 export async function sendChatMessage(payload: {
-  document_id: string;
+  document_id?: string; // omit for general tax help chat (no document required)
   chat_id?: string;
   question: string;
   language: string;
@@ -99,6 +111,20 @@ export async function sendGeneralChatMessage(payload: {
   return res;
 }
 
+export async function summarizeDocument(payload: {
+  document_id: string;
+  language: string;
+}): Promise<ChatApiResponse> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${FASTAPI_URL}/chat/summarize`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 // ─── Tasks ────────────────────────────────────────────────────────────────────
 
 export async function getTaskRecommendations(
@@ -126,33 +152,7 @@ export async function syncTasksFromQuestionnaire(
   return res.json();
 }
 
-// ─── Document Viewing ─────────────────────────────────────────────────────────
-
-export async function getDocumentSignedUrl(
-  documentId: string
-): Promise<{ signed_url: string }> {
-  const headers = await getAuthHeaders();
-  const res = await fetch(
-    `${FASTAPI_URL}/documents/${documentId}/signed-url`,
-    { headers }
-  );
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function summarizeDocument(payload: {
-  document_id: string;
-  language: string;
-}): Promise<ChatApiResponse> {
-  const headers = await getAuthHeaders();
-  const res = await fetch(`${FASTAPI_URL}/chat/summarize`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
+// ─── PDF Editing Upload (multipart) ───────────────────────────────────────────
 
 export async function saveEditedPdf(
   documentId: string,
@@ -167,22 +167,21 @@ export async function saveEditedPdf(
 
   const formData = new FormData();
   const cleanBytes = new Uint8Array(pdfBytes);
+
   formData.append(
     "file",
     new Blob([cleanBytes], { type: "application/pdf" }),
     "edited.pdf"
   );
 
-  const res = await fetch(
-    `${FASTAPI_URL}/documents/${documentId}/save-pdf`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: formData,
-    }
-  );
+  const res = await fetch(`${FASTAPI_URL}/documents/${documentId}/save-pdf`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: formData,
+  });
+
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

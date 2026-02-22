@@ -6,12 +6,12 @@ The system prompt instructs Gemini to:
   - Give actionable tax form instructions
 """
 
-from typing import List
+from typing import List, Optional
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage
 
 from config import settings
 
@@ -130,10 +130,7 @@ def answer_question(
     language_name = LANG_CODE_TO_NAME.get(language_code, "English")
 
     context = "\n\n---\n\n".join(
-        [
-            f"[Page {c['metadata'].get('page', '?')}] {c['chunk_text']}"
-            for c in chunks
-        ]
+        [f"[Page {c['metadata'].get('page', '?')}] {c['chunk_text']}" for c in chunks]
     )
 
     if not context:
@@ -152,24 +149,30 @@ def answer_general_tax_question(
     question: str,
     language_code: str = "en",
     profile_summary: str = "",
-    chat_history: list = None,
-    images: list = None,
+    chat_history: Optional[list] = None,
+    images: Optional[list] = None,
 ) -> str:
     """
     Generate a multilingual answer for general tax questions (no document context).
     Optionally includes a summary of the user's tax profile for personalized advice.
+
+    images: optional list of dicts like:
+      { "mime_type": "image/png", "data": "<base64_without_prefix>" }
     """
     language_name = LANG_CODE_TO_NAME.get(language_code, "English")
 
     profile_context = ""
     if profile_summary:
-        profile_context = f"""Here is what we know about this user's tax situation:
-{profile_summary}
-Use this context to give more specific and relevant advice."""
+        profile_context = (
+            "Here is what we know about this user's tax situation:\n"
+            f"{profile_summary}\n"
+            "Use this context to give more specific and relevant advice."
+        )
 
     if chat_history is None:
         chat_history = []
 
+    # Build a multimodal HumanMessage (text + optional images)
     msg_content = [{"type": "text", "text": question}]
     for img in (images or []):
         msg_content.append(
@@ -178,6 +181,7 @@ Use this context to give more specific and relevant advice."""
                 "image_url": {"url": f"data:{img['mime_type']};base64,{img['data']}"},
             }
         )
+
     chat_history.append(HumanMessage(content=msg_content))
 
     return _general_chain.invoke(
@@ -188,23 +192,28 @@ Use this context to give more specific and relevant advice."""
         }
     )
 
+
 async def stream_general_tax_question(
     question: str,
     language_code: str = "en",
     profile_summary: str = "",
-    chat_history: list = None,
-    images: list = None,
+    chat_history: Optional[list] = None,
+    images: Optional[list] = None,
 ):
     """
     Generate an async streaming response for general tax questions.
+
+    Yields text chunks (strings).
     """
     language_name = LANG_CODE_TO_NAME.get(language_code, "English")
 
     profile_context = ""
     if profile_summary:
-        profile_context = f"""Here is what we know about this user's tax situation:
-{profile_summary}
-Use this context to give more specific and relevant advice."""
+        profile_context = (
+            "Here is what we know about this user's tax situation:\n"
+            f"{profile_summary}\n"
+            "Use this context to give more specific and relevant advice."
+        )
 
     if chat_history is None:
         chat_history = []
@@ -217,6 +226,7 @@ Use this context to give more specific and relevant advice."""
                 "image_url": {"url": f"data:{img['mime_type']};base64,{img['data']}"},
             }
         )
+
     chat_history.append(HumanMessage(content=msg_content))
 
     async for chunk in _general_chain.astream(
@@ -276,14 +286,11 @@ def summarize_document_sections(
     language_name = LANG_CODE_TO_NAME.get(language_code, "English")
 
     context = "\n\n---\n\n".join(
-        [
-            f"[Page {c['metadata'].get('page', '?')}] {c['chunk_text']}"
-            for c in chunks
-        ]
+        [f"[Page {c['metadata'].get('page', '?')}] {c['chunk_text']}" for c in chunks]
     )
 
     if not context:
-        return f"No content found in this document to summarize."
+        return "No content found in this document to summarize."
 
     return _summarize_chain.invoke(
         {

@@ -6,6 +6,8 @@ POST /documents/{id}/ingest  – Trigger async ingestion pipeline (extract→chu
 GET  /documents              – List user's documents
 """
 
+from typing import Optional
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from supabase import Client
@@ -21,10 +23,11 @@ router = APIRouter()
 
 class CreateDocumentRequest(BaseModel):
     filename: str
-    storage_path: str       # path already uploaded in tax-docs bucket
+    storage_path: str               # path already uploaded in tax-docs bucket
     mime_type: str = "application/pdf"
     file_size_bytes: int = 0
     filing_year: int = 2024
+    task_id: Optional[str] = None   # optional link to a task that prompted this upload
 
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
@@ -40,21 +43,19 @@ async def create_document(
     Creates the documents row with status='pending'.
     Returns the new document record.
     """
-    result = (
-        db.table("documents")
-        .insert(
-            {
-                "user_id": user_id,
-                "filename": req.filename,
-                "storage_path": req.storage_path,
-                "mime_type": req.mime_type,
-                "file_size_bytes": req.file_size_bytes,
-                "ingest_status": "pending",
-                "filing_year": req.filing_year,
-            }
-        )
-        .execute()
-    )
+    row: dict = {
+        "user_id": user_id,
+        "filename": req.filename,
+        "storage_path": req.storage_path,
+        "mime_type": req.mime_type,
+        "file_size_bytes": req.file_size_bytes,
+        "ingest_status": "pending",
+        "filing_year": req.filing_year,
+    }
+    if req.task_id:
+        row["task_id"] = req.task_id
+
+    result = db.table("documents").insert(row).execute()
     if not result.data:
         raise HTTPException(status_code=500, detail="Failed to create document record")
     return result.data[0]
@@ -119,7 +120,13 @@ async def get_signed_url(
     Return a temporary signed URL (1 hour) for reading the PDF in-browser.
     Ownership is verified through the RLS-enforced query.
     """
-    doc = db.table("documents").select("storage_path").eq("id", document_id).maybe_single().execute()
+    doc = (
+        db.table("documents")
+        .select("storage_path")
+        .eq("id", document_id)
+        .maybe_single()
+        .execute()
+    )
     if not doc.data:
         raise HTTPException(status_code=404, detail="Document not found")
 
@@ -140,7 +147,7 @@ async def save_edited_pdf(
 ):
     """
     Overwrite the stored PDF with a user-edited version.
-    After saving, optionally re-triggers ingestion so RAG indexes reflect edits.
+    After saving, re-triggers ingestion so RAG indexes reflect edits.
     """
     doc = db.table("documents").select("*").eq("id", document_id).maybe_single().execute()
     if not doc.data:
@@ -149,20 +156,22 @@ async def save_edited_pdf(
     storage_path = doc.data["storage_path"]
     file_bytes = await file.read()
 
-    # Overwrite in Supabase Storage
+    # Overwrite in Supabase Storage (service role)
     service_db.storage.from_("tax-docs").update(
-        storage_path, file_bytes, {"content-type": "application/pdf", "upsert": "true"}
+        storage_path,
+        file_bytes,
+        {"content-type": "application/pdf", "upsert": "true"},
     )
 
-    # Update file size
+    # Update file size + mark as pending/processing will happen in pipeline
     service_db.table("documents").update(
         {"file_size_bytes": len(file_bytes)}
     ).eq("id", document_id).execute()
 
-    # Re-trigger ingestion so RAG indexes reflect the edits
-    # First clear old chunks
+    # Clear old chunks so indexes reflect edits
     service_db.table("document_chunks").delete().eq("document_id", document_id).execute()
 
+    # Re-trigger ingestion pipeline
     background_tasks.add_task(
         _run_ingestion_pipeline,
         document_id=document_id,

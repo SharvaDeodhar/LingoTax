@@ -39,99 +39,97 @@ export type QuestionnaireMainData = Omit<
   "id" | "user_id" | "created_at" | "updated_at"
 >;
 
-function buildInitialData(
-  init?: Partial<Questionnaire>
-): QuestionnaireMainData {
+function buildInitialData(init?: Partial<Questionnaire>): QuestionnaireMainData {
   return {
-    filing_year:              init?.filing_year              ?? CURRENT_FILING_YEAR,
-    questionnaire_version:    2,
-    filing_status:            init?.filing_status            ?? null,
-    residency_status:         init?.residency_status         ?? null,
-    visa_type:                init?.visa_type                ?? null,
-    has_ssn:                  init?.has_ssn                  ?? null,
-    has_itin:                 init?.has_itin                 ?? null,
-    num_dependents:           init?.num_dependents           ?? 0,
-    states_lived:             init?.states_lived             ?? [],
-    states_worked:            init?.states_worked            ?? [],
-    income_sources:           init?.income_sources           ?? [],
-    notes:                    init?.notes                    ?? null,
-    country_of_residence:     init?.country_of_residence     ?? null,
-    multi_state_lived:        init?.multi_state_lived        ?? null,
-    age_on_dec31:             init?.age_on_dec31             ?? null,
-    ssn_status:               init?.ssn_status               ?? null,
-    itin_status:              init?.itin_status              ?? null,
-    filing_for:               init?.filing_for               ?? null,
-    is_us_citizen:            init?.is_us_citizen            ?? null,
-    is_permanent_resident:    init?.is_permanent_resident    ?? null,
-    immigration_statuses:     init?.immigration_statuses     ?? [],
+    filing_year: init?.filing_year ?? CURRENT_FILING_YEAR,
+    questionnaire_version: 2,
+    filing_status: init?.filing_status ?? null,
+    residency_status: init?.residency_status ?? null,
+    visa_type: init?.visa_type ?? null,
+    has_ssn: init?.has_ssn ?? null,
+    has_itin: init?.has_itin ?? null,
+    num_dependents: init?.num_dependents ?? 0,
+    states_lived: init?.states_lived ?? [],
+    states_worked: init?.states_worked ?? [],
+    income_sources: init?.income_sources ?? [],
+    notes: init?.notes ?? null,
+    country_of_residence: init?.country_of_residence ?? null,
+    multi_state_lived: init?.multi_state_lived ?? null,
+    age_on_dec31: init?.age_on_dec31 ?? null,
+    ssn_status: init?.ssn_status ?? null,
+    itin_status: init?.itin_status ?? null,
+    filing_for: init?.filing_for ?? null,
+    is_us_citizen: init?.is_us_citizen ?? null,
+    is_permanent_resident: init?.is_permanent_resident ?? null,
+    immigration_statuses: init?.immigration_statuses ?? [],
     immigration_status_other: init?.immigration_status_other ?? null,
-    status_changed:           init?.status_changed           ?? null,
-    first_entry_date:         init?.first_entry_date         ?? null,
-    us_days_current_type:     init?.us_days_current_type     ?? null,
-    us_days_current:          init?.us_days_current          ?? null,
-    us_days_year_minus1:      init?.us_days_year_minus1      ?? null,
-    us_days_year_minus2:      init?.us_days_year_minus2      ?? null,
-    us_days_prior_not_sure:   init?.us_days_prior_not_sure   ?? false,
-    is_exempt_individual:     init?.is_exempt_individual     ?? null,
-    received_scholarship:     init?.received_scholarship     ?? null,
-    received_school_tax_forms:init?.received_school_tax_forms ?? null,
-    marital_status:           init?.marital_status           ?? null,
-    spouse_location:          init?.spouse_location          ?? null,
-    spouse_id_type:           init?.spouse_id_type           ?? null,
-    has_dependents:           init?.has_dependents           ?? null,
-    employee_wages:           init?.employee_wages           ?? null,
-    received_w2:              init?.received_w2              ?? null,
-    num_employers:            init?.num_employers            ?? null,
-    worked_multi_state:       init?.worked_multi_state       ?? null,
-    freelance_income:         init?.freelance_income         ?? null,
-    received_1099:            init?.received_1099            ?? null,
-    has_business_expenses:    init?.has_business_expenses    ?? null,
-    used_car_for_work:        init?.used_car_for_work        ?? null,
-    earned_bank_interest:     init?.earned_bank_interest     ?? null,
-    has_investments:          init?.has_investments          ?? null,
-    sold_investments:         init?.sold_investments         ?? null,
-    received_broker_forms:    init?.received_broker_forms    ?? null,
-    was_student:              init?.was_student              ?? null,
-    paid_tuition:             init?.paid_tuition             ?? null,
-    received_1098t:           init?.received_1098t           ?? null,
-    taxable_scholarship_inc:  init?.taxable_scholarship_inc  ?? null,
-    foreign_bank_accounts:    init?.foreign_bank_accounts    ?? null,
-    multi_country_accounts:   init?.multi_country_accounts   ?? null,
-    foreign_accounts_value:   init?.foreign_accounts_value   ?? null,
-    foreign_income:           init?.foreign_income           ?? null,
-    owns_foreign_company:     init?.owns_foreign_company     ?? null,
+    status_changed: init?.status_changed ?? null,
+    first_entry_date: init?.first_entry_date ?? null,
+    us_days_current_type: init?.us_days_current_type ?? null,
+    us_days_current: init?.us_days_current ?? null,
+    us_days_year_minus1: init?.us_days_year_minus1 ?? null,
+    us_days_year_minus2: init?.us_days_year_minus2 ?? null,
+    us_days_prior_not_sure: init?.us_days_prior_not_sure ?? false,
+    is_exempt_individual: init?.is_exempt_individual ?? null,
+    received_scholarship: init?.received_scholarship ?? null,
+    received_school_tax_forms: init?.received_school_tax_forms ?? null,
+    marital_status: init?.marital_status ?? null,
+    spouse_location: init?.spouse_location ?? null,
+    spouse_id_type: init?.spouse_id_type ?? null,
+    has_dependents: init?.has_dependents ?? null,
+    employee_wages: init?.employee_wages ?? null,
+    received_w2: init?.received_w2 ?? null,
+    num_employers: init?.num_employers ?? null,
+    worked_multi_state: init?.worked_multi_state ?? null,
+    freelance_income: init?.freelance_income ?? null,
+    received_1099: init?.received_1099 ?? null,
+    has_business_expenses: init?.has_business_expenses ?? null,
+    used_car_for_work: init?.used_car_for_work ?? null,
+    earned_bank_interest: init?.earned_bank_interest ?? null,
+    has_investments: init?.has_investments ?? null,
+    sold_investments: init?.sold_investments ?? null,
+    received_broker_forms: init?.received_broker_forms ?? null,
+    was_student: init?.was_student ?? null,
+    paid_tuition: init?.paid_tuition ?? null,
+    received_1098t: init?.received_1098t ?? null,
+    taxable_scholarship_inc: init?.taxable_scholarship_inc ?? null,
+    foreign_bank_accounts: init?.foreign_bank_accounts ?? null,
+    multi_country_accounts: init?.multi_country_accounts ?? null,
+    foreign_accounts_value: init?.foreign_accounts_value ?? null,
+    foreign_income: init?.foreign_income ?? null,
+    owns_foreign_company: init?.owns_foreign_company ?? null,
     received_foreign_family_money: init?.received_foreign_family_money ?? null,
-    foreign_family_money_type:     init?.foreign_family_money_type     ?? null,
-    paid_foreign_taxes:       init?.paid_foreign_taxes       ?? null,
-    filing_foreign_taxes:     init?.filing_foreign_taxes     ?? null,
-    health_coverage:          init?.health_coverage          ?? null,
-    marketplace_insurance:    init?.marketplace_insurance    ?? null,
-    received_1095a:           init?.received_1095a           ?? null,
-    life_events:              init?.life_events              ?? [],
-    deduct_tuition_fees:      init?.deduct_tuition_fees      ?? null,
-    deduct_student_loan_int:  init?.deduct_student_loan_int  ?? null,
-    claimed_as_dependent:     init?.claimed_as_dependent     ?? null,
-    paid_childcare:           init?.paid_childcare           ?? null,
-    bought_work_supplies:     init?.bought_work_supplies     ?? null,
-    paid_biz_comms:           init?.paid_biz_comms           ?? null,
-    has_home_office:          init?.has_home_office          ?? null,
-    paid_rent:                init?.paid_rent                ?? null,
-    paid_mortgage:            init?.paid_mortgage            ?? null,
-    made_donations:           init?.made_donations           ?? null,
-    paid_state_local_taxes:   init?.paid_state_local_taxes   ?? null,
-    contributed_hsa:          init?.contributed_hsa          ?? null,
-    withdrew_hsa:             init?.withdrew_hsa             ?? null,
-    large_medical_expenses:   init?.large_medical_expenses   ?? null,
-    contributed_ira:          init?.contributed_ira          ?? null,
-    owned_documents:          init?.owned_documents          ?? [],
-    waiting_for_forms:        init?.waiting_for_forms        ?? null,
-    lost_forms:               init?.lost_forms               ?? null,
-    can_contact_issuer:       init?.can_contact_issuer       ?? null,
-    filed_us_taxes:           init?.filed_us_taxes           ?? null,
-    first_filed_year:         init?.first_filed_year         ?? null,
-    has_prior_return:         init?.has_prior_return         ?? null,
-    prior_filing_type:        init?.prior_filing_type        ?? null,
-    received_irs_letter:      init?.received_irs_letter      ?? null,
+    foreign_family_money_type: init?.foreign_family_money_type ?? null,
+    paid_foreign_taxes: init?.paid_foreign_taxes ?? null,
+    filing_foreign_taxes: init?.filing_foreign_taxes ?? null,
+    health_coverage: init?.health_coverage ?? null,
+    marketplace_insurance: init?.marketplace_insurance ?? null,
+    received_1095a: init?.received_1095a ?? null,
+    life_events: init?.life_events ?? [],
+    deduct_tuition_fees: init?.deduct_tuition_fees ?? null,
+    deduct_student_loan_int: init?.deduct_student_loan_int ?? null,
+    claimed_as_dependent: init?.claimed_as_dependent ?? null,
+    paid_childcare: init?.paid_childcare ?? null,
+    bought_work_supplies: init?.bought_work_supplies ?? null,
+    paid_biz_comms: init?.paid_biz_comms ?? null,
+    has_home_office: init?.has_home_office ?? null,
+    paid_rent: init?.paid_rent ?? null,
+    paid_mortgage: init?.paid_mortgage ?? null,
+    made_donations: init?.made_donations ?? null,
+    paid_state_local_taxes: init?.paid_state_local_taxes ?? null,
+    contributed_hsa: init?.contributed_hsa ?? null,
+    withdrew_hsa: init?.withdrew_hsa ?? null,
+    large_medical_expenses: init?.large_medical_expenses ?? null,
+    contributed_ira: init?.contributed_ira ?? null,
+    owned_documents: init?.owned_documents ?? [],
+    waiting_for_forms: init?.waiting_for_forms ?? null,
+    lost_forms: init?.lost_forms ?? null,
+    can_contact_issuer: init?.can_contact_issuer ?? null,
+    filed_us_taxes: init?.filed_us_taxes ?? null,
+    first_filed_year: init?.first_filed_year ?? null,
+    has_prior_return: init?.has_prior_return ?? null,
+    prior_filing_type: init?.prior_filing_type ?? null,
+    received_irs_letter: init?.received_irs_letter ?? null,
   };
 }
 
@@ -202,9 +200,10 @@ export function QuestionnaireForm({
     };
 
     // Ensure the profiles row exists — guards against trigger not firing at sign-up
-    await supabase
-      .from("profiles")
-      .upsert({ user_id: userId }, { onConflict: "user_id", ignoreDuplicates: true });
+    await supabase.from("profiles").upsert(
+      { user_id: userId },
+      { onConflict: "user_id", ignoreDuplicates: true }
+    );
 
     // Check if a questionnaire already exists for this user/year
     const { data: existing } = await supabase
@@ -222,6 +221,7 @@ export function QuestionnaireForm({
         .from("questionnaires")
         .update(syncedData)
         .eq("id", existing.id);
+
       if (updateErr) {
         setError(updateErr.message);
         setSaving(false);
@@ -235,6 +235,7 @@ export function QuestionnaireForm({
         .insert({ user_id: userId, ...syncedData })
         .select("id")
         .single();
+
       if (insertErr || !inserted) {
         setError(insertErr?.message ?? "Failed to save.");
         setSaving(false);
@@ -244,10 +245,22 @@ export function QuestionnaireForm({
     }
 
     await Promise.all([
-      supabase.from("questionnaire_dependents").delete().eq("questionnaire_id", qId),
-      supabase.from("questionnaire_immigration_history").delete().eq("questionnaire_id", qId),
-      supabase.from("questionnaire_state_residency").delete().eq("questionnaire_id", qId),
-      supabase.from("questionnaire_d5_income").delete().eq("questionnaire_id", qId),
+      supabase
+        .from("questionnaire_dependents")
+        .delete()
+        .eq("questionnaire_id", qId),
+      supabase
+        .from("questionnaire_immigration_history")
+        .delete()
+        .eq("questionnaire_id", qId),
+      supabase
+        .from("questionnaire_state_residency")
+        .delete()
+        .eq("questionnaire_id", qId),
+      supabase
+        .from("questionnaire_d5_income")
+        .delete()
+        .eq("questionnaire_id", qId),
     ]);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -255,37 +268,62 @@ export function QuestionnaireForm({
 
     if (dependents.length > 0) {
       inserts.push(
-        supabase.from("questionnaire_dependents").insert(
-          dependents.map((d, i) => ({
-            ...d, id: undefined, questionnaire_id: qId, user_id: userId, sort_order: i,
-          }))
-        ).then(() => null)
+        supabase
+          .from("questionnaire_dependents")
+          .insert(
+            dependents.map((d, i) => ({
+              ...d,
+              id: undefined,
+              questionnaire_id: qId,
+              user_id: userId,
+              sort_order: i,
+            }))
+          )
+          .then(() => null)
       );
     }
+
     if (immigrationHistory.length > 0) {
       inserts.push(
-        supabase.from("questionnaire_immigration_history").insert(
-          immigrationHistory.map((r, i) => ({
-            ...r, id: undefined, questionnaire_id: qId, user_id: userId, sort_order: i,
-          }))
-        ).then(() => null)
+        supabase
+          .from("questionnaire_immigration_history")
+          .insert(
+            immigrationHistory.map((r, i) => ({
+              ...r,
+              id: undefined,
+              questionnaire_id: qId,
+              user_id: userId,
+              sort_order: i,
+            }))
+          )
+          .then(() => null)
       );
     }
+
     if (stateResidency.length > 0) {
       inserts.push(
-        supabase.from("questionnaire_state_residency").insert(
-          stateResidency.map((r, i) => ({
-            ...r, id: undefined, questionnaire_id: qId, user_id: userId, sort_order: i,
-          }))
-        ).then(() => null)
+        supabase
+          .from("questionnaire_state_residency")
+          .insert(
+            stateResidency.map((r, i) => ({
+              ...r,
+              id: undefined,
+              questionnaire_id: qId,
+              user_id: userId,
+              sort_order: i,
+            }))
+          )
+          .then(() => null)
       );
     }
+
     const d5Rows = d5Income.filter((d) => d.flag !== null);
     if (d5Rows.length > 0) {
       inserts.push(
-        supabase.from("questionnaire_d5_income").insert(
-          d5Rows.map((d) => ({ ...d, questionnaire_id: qId, user_id: userId }))
-        ).then(() => null)
+        supabase
+          .from("questionnaire_d5_income")
+          .insert(d5Rows.map((d) => ({ ...d, questionnaire_id: qId, user_id: userId })))
+          .then(() => null)
       );
     }
 
@@ -293,6 +331,8 @@ export function QuestionnaireForm({
 
     // After successfully saving the questionnaire, generate/update
     // the personalized dashboard task list from these answers.
+    // NOTE: If your API wrapper expects an object payload, change this call to:
+    //   await syncTasksFromQuestionnaire({ filing_year: syncedData.filing_year });
     try {
       await syncTasksFromQuestionnaire(syncedData.filing_year);
     } catch (err) {
@@ -351,7 +391,9 @@ export function QuestionnaireForm({
             </button>
             {i < STEPS.length - 1 && (
               <div
-                className={`w-3 h-0.5 mb-3 ${i < step ? "bg-blue-500" : "bg-gray-200"}`}
+                className={`w-3 h-0.5 mb-3 ${
+                  i < step ? "bg-blue-500" : "bg-gray-200"
+                }`}
               />
             )}
           </div>
@@ -405,7 +447,8 @@ export function QuestionnaireForm({
       </div>
 
       <p className="text-xs text-muted-foreground mt-3 text-center">
-        You can navigate between sections freely. Progress saves only when you click &ldquo;Save profile&rdquo;.
+        You can navigate between sections freely. Progress saves only when you
+        click &ldquo;Save profile&rdquo;.
       </p>
     </div>
   );

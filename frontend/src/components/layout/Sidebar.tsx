@@ -3,13 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
-import {
-  LayoutDashboard,
-  Files,
-  Bot,
-  User,
-  Settings,
-} from "lucide-react";
+import { LayoutDashboard, Files, Bot, User, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -27,7 +21,12 @@ export function Sidebar() {
     <aside className="w-56 shrink-0 bg-white border-r flex flex-col">
       {/* Brand */}
       <div className="px-5 py-4 border-b flex items-center gap-2">
-        <Image src="/favicon/favicon-32x32.png" alt="Logo" width={24} height={24} />
+        <Image
+          src="/favicon/favicon-32x32.png"
+          alt="Logo"
+          width={24}
+          height={24}
+        />
         <span className="text-lg font-bold text-blue-600">LinguaTax</span>
       </div>
 

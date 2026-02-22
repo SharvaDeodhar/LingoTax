@@ -12,7 +12,7 @@ from config import settings
 
 genai.configure(api_key=settings.gemini_api_key)
 
-_EMBEDDING_MODEL = "models/text-embedding-004"
+_EMBEDDING_MODEL = "models/gemini-embedding-001"
 _OUTPUT_DIM = 768
 
 

@@ -21,9 +21,16 @@ export default async function HelpPage() {
   const preferredLanguage = (profile as Profile | null)?.preferred_language ?? "en";
 
   return (
-    <div className="h-[calc(100vh-4rem)]">
-      <GeneralChatInterface preferredLanguage={preferredLanguage} />
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
+      <div className="px-6 py-4 border-b bg-white">
+        <h1 className="text-lg font-bold">Tax Help</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Ask any US tax question — no document required. Answers are in your preferred language.
+        </p>
+      </div>
+      <div className="flex-1 overflow-hidden">
+        <GeneralChatInterface preferredLanguage={preferredLanguage} />
+      </div>
     </div>
   );
 }
-

@@ -49,36 +49,38 @@ def get_current_user_id(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> str:
     """
-    Extracts user_id (sub) from the Supabase JWT without making a network call.
-    Supabase JWTs are HS256, signed with the project JWT secret.
-    We decode without full signature verification here for performance;
-    RLS enforcement via the user Supabase client is the true security layer.
+    Extracts user_id from the Supabase JWT payload via plain base64url decode.
+    No library dependencies, no network calls, works with all Supabase key formats.
+
+    Security note: PostgREST validates the JWT signature on every DB query via
+    get_user_supabase, and RLS enforces auth.uid() = user_id for all table access.
+    Token forgery would be rejected at the DB layer even if it passed here.
     """
-    from jose import jwt, JWTError
+    import base64
+    import json
+    import time
 
     token = credentials.credentials
     try:
-        # Decode without verifying signature for speed.
-        # True security comes from Supabase RLS enforcing auth.uid().
-        payload = jwt.decode(
-            token,
-            key="",  # not used when verify_signature=False
-            algorithms=["HS256"],
-            options={
-                "verify_signature": False, 
-                "verify_exp": True,
-                "verify_aud": False,
-            },
-        )
+        parts = token.split(".")
+        if len(parts) != 3:
+            raise ValueError("not a JWT")
+
+        # base64url-decode the payload segment (pad to a multiple of 4)
+        payload_b64 = parts[1] + "=" * (-len(parts[1]) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+
         user_id: str = payload.get("sub", "")
         if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token: missing sub claim",
-            )
+            raise ValueError("missing sub claim")
+
+        exp = payload.get("exp")
+        if exp and exp < time.time():
+            raise ValueError("token expired")
+
         return user_id
-    except JWTError as exc:
+    except (ValueError, KeyError, json.JSONDecodeError) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid or expired token: {exc}",
+            detail=f"Invalid token: {exc}",
         )
