@@ -17,12 +17,13 @@ import asyncio
 from supabase import Client
 from dependencies import get_current_user_id, get_user_supabase
 
-from rag.retriever import retrieve_chunks
+from rag.retriever import retrieve_chunks, deduplicate_sources, retrieve_all_chunks
 from rag.chain import (
     answer_question,
     answer_general_tax_question,
     summarize_document_sections,
     stream_general_tax_question,
+    stream_document_chat,
 )
 from langchain_core.messages import HumanMessage, AIMessage
 
@@ -49,7 +50,7 @@ class GeneralChatRequest(BaseModel):
     images: Optional[List[dict]] = None  # [{ mime_type: str, data: str(base64) }, ...]
 
 
-@router.post("", response_model=ChatResponse)
+@router.post("")
 async def chat(
     req: ChatRequest,
     user_id: str = Depends(get_current_user_id),
@@ -65,7 +66,7 @@ async def chat(
             .maybe_single()
             .execute()
         )
-        if not doc.data:
+        if not (doc and doc.data):
             raise HTTPException(status_code=404, detail="Document not found")
         if doc.data["ingest_status"] != "ready":
             raise HTTPException(
@@ -88,6 +89,8 @@ async def chat(
                 )
                 .execute()
             )
+            if not (chat_result and chat_result.data):
+                raise HTTPException(status_code=500, detail="Failed to create chat session")
             chat_id = chat_result.data[0]["id"]
 
         # 3) Store user message
@@ -104,38 +107,47 @@ async def chat(
         # 4) Retrieve relevant chunks via pgvector
         chunks = retrieve_chunks(db, req.document_id, req.question)
 
-        # 5) Generate answer with LangChain + Gemini RAG
-        answer = answer_question(
-            question=req.question,
-            chunks=chunks,
-            language_code=req.language,
-        )
-
-        # 6) Build sources for citation display
+        # Deduplicate sources for final storage and return
+        clean_chunks = deduplicate_sources(chunks, max_count=3)
         sources = [
             {
-                "chunk_id": c["id"],
-                "chunk_text": c["chunk_text"][:300],
                 "page": c["metadata"].get("page"),
-                "form_fields": c["metadata"].get("form_fields", {}),
-                "similarity": round(c.get("similarity", 0), 3),
+                "snippet": c["chunk_text"][:200],
+                "label": c["metadata"].get("label"),
+                "doc_id": req.document_id,
             }
-            for c in chunks
+            for c in clean_chunks
         ]
 
-        # 7) Store assistant message
-        db.table("chat_messages").insert(
-            {
-                "chat_id": chat_id,
-                "user_id": user_id,
-                "role": "assistant",
-                "content": answer,
-                "lang": req.language,
-                "sources": sources,
-            }
-        ).execute()
+        # 5) Generate answer with streaming and status updates
+        async def generate():
+            yield json.dumps({"type": "meta", "chat_id": chat_id}) + "\n"
+            yield json.dumps({"type": "sources", "sources": sources}) + "\n"
+            
+            full_answer = ""
+            async for event in stream_document_chat(
+                question=req.question,
+                chunks=chunks,
+                language_code=req.language,
+                is_summary=False
+            ):
+                if event["type"] == "answer_token":
+                    full_answer += event["text"]
+                yield json.dumps(event) + "\n"
 
-        return ChatResponse(chat_id=chat_id, answer=answer, sources=sources)
+            # 6) Store assistant message at end
+            db.table("chat_messages").insert(
+                {
+                    "chat_id": chat_id,
+                    "user_id": user_id,
+                    "role": "assistant",
+                    "content": full_answer,
+                    "lang": req.language,
+                    "sources": sources,
+                }
+            ).execute()
+
+        return StreamingResponse(generate(), media_type="application/x-ndjson")
 
     # ── General tax help chat (no document) ───────────────────────────────────
     # Keep this non-streaming general response for simple clients.
@@ -372,7 +384,7 @@ class SummarizeRequest(BaseModel):
     language: str = "en"
 
 
-@router.post("/summarize", response_model=ChatResponse)
+@router.post("/summarize")
 async def summarize_document(
     req: SummarizeRequest,
     user_id: str = Depends(get_current_user_id),
@@ -391,7 +403,7 @@ async def summarize_document(
         .maybe_single()
         .execute()
     )
-    if not doc.data:
+    if not (doc and doc.data):
         raise HTTPException(status_code=404, detail="Document not found")
     if doc.data["ingest_status"] != "ready":
         raise HTTPException(
@@ -399,58 +411,91 @@ async def summarize_document(
             detail=f"Document is not ready (status: {doc.data['ingest_status']})",
         )
 
-    # 2) Create a chat session for this document summary
-    chat_result = (
-        db.table("chats")
-        .insert(
-            {
-                "user_id": user_id,
-                "document_id": req.document_id,
-                "title": "Document Summary",
-            }
+    # 2) Check for existing auto-summary message to prevent duplicates
+    chat_res = db.table("chats").select("id").eq("document_id", req.document_id).eq("user_id", user_id).execute()
+    if chat_res and chat_res.data:
+        chat_id = chat_res.data[0]["id"]
+        msg_res = db.table("chat_messages") \
+            .select("*") \
+            .eq("chat_id", chat_id) \
+            .execute()
+        
+        # Filter for auto_summary in memory to avoid 400/204 issues with JSONB filters
+        auto_summary_msg = next((m for m in (msg_res.data or []) if (m.get("metadata") or {}).get("auto_summary")), None)
+        
+        if auto_summary_msg:
+            async def stream_existing():
+                yield json.dumps({"type": "meta", "chat_id": chat_id}) + "\n"
+                yield json.dumps({"type": "sources", "sources": auto_summary_msg.get("sources") or []}) + "\n"
+                # Stream the existing content as a single block or multiple chunks
+                yield json.dumps({"type": "answer_token", "text": auto_summary_msg["content"]}) + "\n"
+                yield json.dumps({"type": "done"}) + "\n"
+            return StreamingResponse(stream_existing(), media_type="application/x-ndjson")
+        
+        existing_chat_id = chat_id
+    else:
+        existing_chat_id = None
+    
+    # 3) Create a chat session if not found
+    if not existing_chat_id:
+        chat_result = (
+            db.table("chats")
+            .insert(
+                {
+                    "user_id": user_id,
+                    "document_id": req.document_id,
+                    "title": "Document Summary",
+                }
+            )
+            .execute()
         )
-        .execute()
-    )
-    chat_id = chat_result.data[0]["id"]
+        chat_id = chat_result.data[0]["id"]
+    else:
+        chat_id = existing_chat_id
 
-    # 3) Fetch ALL chunks (not just top-k)
-    chunks_res = (
-        db.table("document_chunks")
-        .select("id, chunk_text, metadata")
-        .eq("document_id", req.document_id)
-        .order("chunk_index")
-        .execute()
-    )
-    chunks = chunks_res.data or []
+    # 4) Fetch ALL chunks
+    chunks = retrieve_all_chunks(db, req.document_id)
 
-    # 4) Generate section-by-section summary
-    summary = summarize_document_sections(
-        chunks=chunks,
-        language_code=req.language,
-    )
-
-    # 5) Build sources for citation (limit display)
+    # deduplicate sources for the summary display
+    clean_chunks = deduplicate_sources(chunks, max_count=3)
     sources = [
         {
-            "chunk_id": c["id"],
-            "chunk_text": c["chunk_text"][:300],
             "page": c["metadata"].get("page"),
-            "form_fields": c["metadata"].get("form_fields", {}),
-            "similarity": 1.0,
+            "snippet": c["chunk_text"][:200],
+            "label": c["metadata"].get("label"),
+            "doc_id": req.document_id,
         }
-        for c in chunks[:5]
+        for c in clean_chunks
     ]
 
-    # 6) Store assistant message
-    db.table("chat_messages").insert(
-        {
-            "chat_id": chat_id,
-            "user_id": user_id,
-            "role": "assistant",
-            "content": summary,
-            "lang": req.language,
-            "sources": sources,
-        }
-    ).execute()
+    # 5) Generate summary with streaming and status updates
+    async def generate_summary():
+        yield json.dumps({"type": "meta", "chat_id": chat_id}) + "\n"
+        yield json.dumps({"type": "sources", "sources": sources}) + "\n"
+        
+        full_answer = ""
 
-    return ChatResponse(chat_id=chat_id, answer=summary, sources=sources)
+        async for event in stream_document_chat(
+            question="Summarize document",
+            chunks=chunks,
+            language_code=req.language,
+            is_summary=True
+        ):
+            if event["type"] == "answer_token":
+                full_answer += event["text"]
+            yield json.dumps(event) + "\n"
+
+        # 6) Store assistant message at end
+        db.table("chat_messages").insert(
+            {
+                "chat_id": chat_id,
+                "user_id": user_id,
+                "role": "assistant",
+                "content": full_answer,
+                "lang": req.language,
+                "sources": sources,
+                "metadata": {"auto_summary": True}
+            }
+        ).execute()
+
+    return StreamingResponse(generate_summary(), media_type="application/x-ndjson")

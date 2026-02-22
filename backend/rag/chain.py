@@ -69,8 +69,8 @@ and suggest the user check the relevant section of the form directly.
 _llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     google_api_key=settings.gemini_api_key,
-    temperature=0.2,
-    max_output_tokens=2048,
+    temperature=0.1,
+    max_output_tokens=4096,
 )
 
 _prompt = ChatPromptTemplate.from_messages(
@@ -357,23 +357,46 @@ async def stream_general_tax_question(
 # ─── Document section summarization ──────────────────────────────────────────
 
 _SUMMARIZE_SYSTEM_PROMPT = """\
-You are LinguaTax, a multilingual US tax assistant.
+You are LinguaTax, a world-class multilingual US tax expert and advisor.
 The user's preferred language is {language}. You MUST respond entirely in {language}.
 
-You are given the full text content of a tax document. Your task is to produce a
-clear, structured, section-by-section summary of this document.
+You are given the extracted text content of a tax document. Your task is to produce a HIGHLY DETAILED, expanded auto-summary for this document.
 
-For each section or area of the form:
-1. State the section name / box number in English
-2. Explain what it means in simple {language}
-3. State the value found in the document (if any)
-4. Explain what the user should do with this information on their tax return
+**Your response MUST follow this structure exactly:**
 
-Format your response with clear headings and bullet points.
-If this is a standard IRS form (W-2, 1099, 1040, etc.), organize by the form's
-official box/section structure.
+### 1. Document Identification
+- State the legal name of the form (e.g., "IRS Form 1040") and the tax year found.
+- Start with the exact phrase: "Here’s a structured summary of your [Document Name]..."
 
-Keep the summary practical and actionable.
+### 2. Section-by-section breakdown (What each part is for)
+Identify EVERY major physical section found in the document text. For EACH section, you MUST provide:
+- **What it is**: A concise one-sentence description of the section's official purpose.
+- **What you need to provide**: A bulleted list of the specific data, checkboxes, or dollar amounts the taxpayer must enter or confirm in this section.
+- **Common pitfalls**: 1-2 bullets on significant mistakes or often-overlooked details for this specific area.
+- **Related documents/forms**: Explicitly list all supporting forms required (e.g., W-2, 1099-INT/DIV/B, Schedule 1, Schedule A/C/D, etc.).
+
+*Required Focus for Form 1040:* If this is a Form 1040, you MUST detail the following sections if found:
+- Header/Taxpayer Info
+- Dependents
+- Digital Assets
+- Income (Wages, Interest, IRA, etc.)
+- Adjustments (Schedule 1)
+- Deductions (Standard/Itemized)
+- Tax & Credits
+- Payments (Withholding)
+- Refund/Owe
+- Signatures
+
+### 3. Tax Season Checklist
+Provide a customized "What to gather next" checklist tailored to the document type discovered.
+
+**Constraints:**
+- Use English for official box names and line labels in parentheses, e.g., "Wages (Line 1z)".
+- Aim for a comprehensive length (2-3x longer than a standard summary).
+- DO NOT generate more than one greeting.
+- Use valid Markdown headers (###).
+- If information for a requested section is missing from the document, omit that specific section breakdown.
+- Respond ONLY in {language}.
 
 --- Document content ---
 {context}
@@ -413,3 +436,57 @@ def summarize_document_sections(
             "language": language_name,
         }
     )
+async def stream_document_chat(
+    question: str,
+    chunks: List[dict],
+    language_code: str = "en",
+    is_summary: bool = False,
+):
+    """
+    Generate an async streaming response for document-specific chat or auto-summary.
+    Yields events for progress tracking and final answer tokens.
+    """
+    language_name = LANG_CODE_TO_NAME.get(language_code, "English")
+
+    # 1. Reading / Processing stage
+    yield {"type": "status", "stage": "reading_document"}
+    await asyncio.sleep(0.5)
+
+    if is_summary:
+        yield {"type": "status", "stage": "building_chunks"}
+        # Prepare context from ALL chunks
+        context = "\n\n---\n\n".join(
+            [f"[Page {c['metadata'].get('page', '?')}] {c['chunk_text']}" for c in chunks]
+        )
+        await asyncio.sleep(0.8)
+        
+        yield {"type": "status", "stage": "writing_answer"}
+        async for chunk in _summarize_chain.astream(
+            {
+                "context": context,
+                "language": language_name,
+            }
+        ):
+            yield {"type": "answer_token", "text": chunk}
+    else:
+        yield {"type": "status", "stage": "checking_rag_db"}
+        await asyncio.sleep(0.6)
+
+        yield {"type": "status", "stage": "selecting_sources"}
+        # Context from top-k chunks
+        context = "\n\n---\n\n".join(
+            [f"[Page {c['metadata'].get('page', '?')}] {c['chunk_text']}" for c in chunks]
+        )
+        await asyncio.sleep(0.6)
+
+        yield {"type": "status", "stage": "writing_answer"}
+        async for chunk in _rag_chain.astream(
+            {
+                "question": question,
+                "context": context,
+                "language": language_name,
+            }
+        ):
+            yield {"type": "answer_token", "text": chunk}
+
+    yield {"type": "done"}

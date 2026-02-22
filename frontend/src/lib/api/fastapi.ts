@@ -80,11 +80,11 @@ export async function getDocumentSignedUrl(
 // ─── Chat ─────────────────────────────────────────────────────────────────────
 
 export async function sendChatMessage(payload: {
-  document_id?: string; // omit for general tax help chat (no document required)
+  document_id?: string;
   chat_id?: string;
   question: string;
   language: string;
-}): Promise<ChatApiResponse> {
+}): Promise<Response> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${FASTAPI_URL}/chat`, {
     method: "POST",
@@ -92,7 +92,7 @@ export async function sendChatMessage(payload: {
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return res;
 }
 
 export async function sendGeneralChatMessage(payload: {
@@ -114,7 +114,7 @@ export async function sendGeneralChatMessage(payload: {
 export async function summarizeDocument(payload: {
   document_id: string;
   language: string;
-}): Promise<ChatApiResponse> {
+}): Promise<Response> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${FASTAPI_URL}/chat/summarize`, {
     method: "POST",
@@ -122,7 +122,7 @@ export async function summarizeDocument(payload: {
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return res;
 }
 
 // ─── Tasks ────────────────────────────────────────────────────────────────────

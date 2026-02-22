@@ -14,7 +14,7 @@ from supabase import Client
 
 from dependencies import get_current_user_id, get_service_supabase, get_user_supabase
 from services import pdf_service, storage_service
-from rag import chunker, embedder
+from rag import chunker, embedder, chain
 
 router = APIRouter()
 
@@ -250,7 +250,99 @@ async def _run_ingestion_pipeline(
         # 7. Mark as ready
         service_db.table("documents").update({"ingest_status": "ready"}).eq("id", document_id).execute()
 
+        # 8. Post-ingestion: Auto-summarize
+        await _auto_summarize_after_ingest(document_id, user_id, service_db)
+
     except Exception as exc:
         service_db.table("documents").update(
             {"ingest_status": "error", "error_message": str(exc)[:500]}
         ).eq("id", document_id).execute()
+
+
+async def _auto_summarize_after_ingest(
+    document_id: str,
+    user_id: str,
+    service_db: Client,
+) -> None:
+    """
+    Check if an auto-summary exists; if not, generate and store it.
+    This creates a chat session if one doesn't exist for this document.
+    """
+    try:
+        # 1. Check for existing chat with this document
+        chat_res = service_db.table("chats") \
+            .select("id") \
+            .eq("document_id", document_id) \
+            .eq("user_id", user_id) \
+            .maybe_single() \
+            .execute()
+        
+        chat_id: Optional[str] = None
+        if chat_res and chat_res.data:
+            chat_id = chat_res.data["id"]
+            
+            # Check for existing auto-summary message
+            msg_res = service_db.table("chat_messages") \
+                .select("*") \
+                .eq("chat_id", chat_id) \
+                .execute()
+            
+            # Filter for auto_summary in memory to avoid 400/204 issues with JSONB filters
+            existing_summary = next((m for m in (msg_res.data or []) if (m.get("metadata") or {}).get("auto_summary")), None)
+            
+            if existing_summary:
+                # Already summarized
+                return
+        else:
+            # Create new chat session for this document
+            doc_res = service_db.table("documents").select("filename").eq("id", document_id).maybe_single().execute()
+            title = doc_res.data["filename"] if (doc_res and doc_res.data) else "Document Chat"
+            
+            new_chat = service_db.table("chats").insert({
+                "user_id": user_id,
+                "document_id": document_id,
+                "title": title
+            }).execute()
+            if not new_chat.data:
+                return
+            chat_id = new_chat.data[0]["id"]
+
+        # 2. Fetch all chunks
+        chunks_res = service_db.table("document_chunks") \
+            .select("id, chunk_text, metadata") \
+            .eq("document_id", document_id) \
+            .order("chunk_index") \
+            .execute()
+        
+        chunks = chunks_res.data or []
+        if not chunks:
+            return
+
+        # 3. Generate summary
+        summary = chain.summarize_document_sections(chunks=chunks, language_code="en")
+
+        # 4. Build sources
+        sources = [
+            {
+                "chunk_id": c["id"],
+                "chunk_text": c["chunk_text"][:300],
+                "page": c["metadata"].get("page"),
+                "form_fields": c["metadata"].get("form_fields", {}),
+                "similarity": 1.0,
+            }
+            for c in chunks[:5]
+        ]
+
+        # 5. Insert auto-summary message
+        service_db.table("chat_messages").insert({
+            "chat_id": chat_id,
+            "user_id": user_id,
+            "role": "assistant",
+            "content": summary,
+            "lang": "en",
+            "sources": sources,
+            "metadata": {"auto_summary": True}
+        }).execute()
+
+    except Exception as e:
+        print(f"Error in _auto_summarize_after_ingest: {e}")

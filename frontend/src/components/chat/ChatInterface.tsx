@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Send, Mic } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { sendChatMessage } from "@/lib/api/fastapi";
+import { sendChatMessage, summarizeDocument } from "@/lib/api/fastapi";
 import { MessageBubble } from "./MessageBubble";
 import { LanguageSelector } from "./LanguageSelector";
-import type { ChatMessage, Document } from "@/types";
+import type { ChatMessage, Document, Source } from "@/types";
 
 interface ChatInterfaceProps {
   document?: Document; // omit for general tax help mode
@@ -27,17 +27,58 @@ export function ChatInterface({
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
+  const [statusStage, setStatusStage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
+
+  const STAGE_LABELS: Record<string, string> = {
+    reading_document: "Reading document…",
+    building_chunks: "Building chunks…",
+    checking_rag_db: "Checking RAG database…",
+    selecting_sources: "Selecting sources…",
+    writing_answer: "Writing answer…",
+  };
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
   const supabase = getSupabaseBrowserClient();
 
-  // Load existing chat history; optionally auto-summarize on first open of a document chat
+  // Poll ingestion status until ready
+  const [ingestStatus, setIngestStatus] = useState(doc?.ingest_status || "pending");
+
   useEffect(() => {
-    async function loadHistory() {
+    if (isGeneralMode || !doc || ingestStatus === "ready" || ingestStatus === "error") return;
+
+    let timer: NodeJS.Timeout;
+    async function checkStatus() {
+      try {
+        const { data, error } = await supabase
+          .from("documents")
+          .select("ingest_status")
+          .eq("id", doc!.id)
+          .maybeSingle();
+
+        if (data?.ingest_status) {
+          setIngestStatus(data.ingest_status);
+        }
+      } catch (err) {
+        console.error("Error polling ingestion status:", err);
+      }
+
+      if (ingestStatus !== "ready" && ingestStatus !== "error") {
+        timer = setTimeout(checkStatus, 3000);
+      }
+    }
+
+    checkStatus();
+    return () => clearTimeout(timer);
+  }, [doc, ingestStatus, isGeneralMode, supabase]);
+
+  // Load existing chat history or trigger summary when ready
+  useEffect(() => {
+    async function initChat() {
+      // 1. Get or create chat session
       let query = supabase
         .from("chats")
         .select("id")
@@ -51,67 +92,135 @@ export function ChatInterface({
       }
 
       const { data: chats } = await query;
+      let currentChatId: string | undefined;
 
       if (chats && chats.length > 0) {
-        const existingChatId = chats[0].id;
-        setChatId(existingChatId);
+        currentChatId = chats[0].id;
+        setChatId(currentChatId);
+      }
 
+      // 2. Load messages if chat session exists
+      if (currentChatId) {
         const { data: msgs } = await supabase
           .from("chat_messages")
           .select("*")
-          .eq("chat_id", existingChatId)
+          .eq("chat_id", currentChatId)
           .order("created_at", { ascending: true });
 
         const existing = (msgs as ChatMessage[]) ?? [];
         setMessages(existing);
 
-        // Auto-summarize only for doc chats, only if enabled, only if empty
-        if (doc && autoSummarize && existing.length === 0) {
-          runAutoSummarize(existingChatId);
+        // If we have messages, we are done
+        if (existing.length > 0) return;
+      }
+
+      // 3. For doc mode, if empty, wait for ingestion and then summary
+      if (doc && autoSummarize) {
+        if (ingestStatus === "ready") {
+          runAutoSummarize(currentChatId);
         }
-      } else if (doc && autoSummarize) {
-        // No chat session at all — auto-summarize will create one
-        runAutoSummarize(undefined);
       }
     }
 
     async function runAutoSummarize(existingChatId: string | undefined) {
       setSummarizing(true);
       setError(null);
+      setStatusStage("reading_document");
       try {
-        const response = await sendChatMessage({
+        // Double check if summary arrived in the background
+        if (existingChatId) {
+          const { data: messages } = await supabase
+            .from("chat_messages")
+            .select("*")
+            .eq("chat_id", existingChatId);
+
+          const msgRes = (messages || []).find((m: any) => m.metadata?.auto_summary);
+
+          if (msgRes) {
+            setMessages([msgRes as ChatMessage]);
+            if (!chatId) setChatId(existingChatId);
+            setSummarizing(false);
+            setStatusStage(null);
+            return;
+          }
+        }
+
+        const response = await summarizeDocument({
           document_id: doc!.id,
-          chat_id: existingChatId,
-          question: "__summarize__",
           language,
         });
 
-        setChatId(response.chat_id);
+        if (!response.body) throw new Error("No response body");
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
 
-        setMessages([
-          {
-            id: crypto.randomUUID(),
-            chat_id: response.chat_id,
-            user_id: "",
-            role: "assistant",
-            content: response.answer,
-            lang: language,
-            sources: [],
-            created_at: new Date().toISOString(),
-          },
-        ]);
+        const assistantMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          chat_id: existingChatId || "",
+          user_id: "",
+          role: "assistant",
+          content: "",
+          lang: language,
+          sources: [],
+          status: "thinking",
+          created_at: new Date().toISOString(),
+        };
+
+        setMessages([assistantMessage]);
+
+        let done = false;
+        let buffer = "";
+        while (!done) {
+          const { value, done: readerDone } = await reader.read();
+          done = readerDone;
+          if (value) {
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              try {
+                const data = JSON.parse(line);
+                if (data.type === "meta" && data.chat_id) {
+                  setChatId(data.chat_id);
+                  assistantMessage.chat_id = data.chat_id;
+                }
+                if (data.type === "status") {
+                  setStatusStage(data.stage);
+                }
+                if (data.type === "sources") {
+                  assistantMessage.sources = data.sources;
+                }
+                if (data.type === "answer_token") {
+                  assistantMessage.status = "responding";
+                  assistantMessage.content += data.text;
+                }
+                if (data.type === "done") {
+                  assistantMessage.status = "done";
+                  setStatusStage(null);
+                  done = true;
+                }
+                setMessages([assistantMessage]);
+              } catch (e) {
+                console.error("Parse error:", e);
+              }
+            }
+          }
+        }
       } catch (err: unknown) {
         setError(
           err instanceof Error ? err.message : "Could not load document summary"
         );
       } finally {
         setSummarizing(false);
+        setStatusStage(null);
       }
     }
 
-    loadHistory();
+    initChat();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc?.id]);
+  }, [doc?.id, ingestStatus]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -137,6 +246,7 @@ export function ChatInterface({
     setQuestion("");
     setLoading(true);
     setError(null);
+    setStatusStage("reading_document");
 
     try {
       const response = await sendChatMessage({
@@ -146,24 +256,73 @@ export function ChatInterface({
         language,
       });
 
-      if (!chatId) setChatId(response.chat_id);
+      if (!response.body) throw new Error("No response body");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
 
       const assistantMessage: ChatMessage = {
         id: crypto.randomUUID(),
-        chat_id: response.chat_id,
+        chat_id: chatId ?? "",
         user_id: "",
         role: "assistant",
-        content: response.answer,
+        content: "",
         lang: language,
-        sources: response.sources ?? [],
+        sources: [],
+        status: "thinking",
         created_at: new Date().toISOString(),
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
+
+      let done = false;
+      let buffer = "";
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const data = JSON.parse(line);
+              if (data.type === "meta" && data.chat_id) {
+                if (!chatId) setChatId(data.chat_id);
+                assistantMessage.chat_id = data.chat_id;
+              }
+              if (data.type === "status") {
+                setStatusStage(data.stage);
+              }
+              if (data.type === "sources") {
+                assistantMessage.sources = data.sources;
+              }
+              if (data.type === "answer_token") {
+                assistantMessage.status = "responding";
+                assistantMessage.content += data.text;
+              }
+              if (data.type === "done") {
+                assistantMessage.status = "done";
+                setStatusStage(null);
+                done = true;
+              }
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMessage.id ? { ...assistantMessage } : m
+                )
+              );
+            } catch (e) {
+              console.error("Parse error:", e);
+            }
+          }
+        }
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setLoading(false);
+      setStatusStage(null);
     }
   }
 
@@ -260,12 +419,14 @@ export function ChatInterface({
             ) : (
               <>
                 <p className="text-sm font-medium mb-2">
-                  {autoSummarize ? "Analyzing your document…" : "Start chatting…"}
+                  {(ingestStatus !== "ready" || statusStage) ? "Analyzing your document…" : "Start chatting…"}
                 </p>
                 <p className="text-xs">
-                  {autoSummarize
-                    ? "Your document breakdown will appear shortly"
-                    : "Ask a question about the document above"}
+                  {statusStage
+                    ? STAGE_LABELS[statusStage as keyof typeof STAGE_LABELS] || "Processing..."
+                    : (ingestStatus !== "ready" || (autoSummarize && messages.length === 0))
+                      ? "Your document breakdown will appear shortly"
+                      : "Ask a question about the document above"}
                 </p>
               </>
             )}
@@ -276,15 +437,19 @@ export function ChatInterface({
           <MessageBubble key={msg.id} message={msg} />
         ))}
 
-        {(loading || summarizing) && (
+        {(loading || summarizing || statusStage || (doc && ingestStatus !== "ready")) && (
           <div className="flex justify-start">
             <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
               <div className="flex items-center gap-2">
-                {summarizing && (
-                  <span className="text-xs text-muted-foreground">
-                    Reading document…
-                  </span>
-                )}
+                <span className="text-xs text-muted-foreground mr-1">
+                  {statusStage
+                    ? STAGE_LABELS[statusStage as keyof typeof STAGE_LABELS]
+                    : ingestStatus !== "ready"
+                      ? "Analyzing document…"
+                      : loading
+                        ? "Thinking…"
+                        : "Reading document…"}
+                </span>
                 <div className="flex gap-1">
                   <span
                     className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
@@ -324,11 +489,13 @@ export function ChatInterface({
             placeholder={
               isListening
                 ? "Listening..."
-                : summarizing
-                ? "Reading document…"
-                : isGeneralMode
-                ? "Ask a tax question…"
-                : "Ask about your document…"
+                : statusStage
+                  ? STAGE_LABELS[statusStage as keyof typeof STAGE_LABELS] || "Processing..."
+                  : summarizing
+                    ? "Reading document…"
+                    : isGeneralMode
+                      ? "Ask a tax question…"
+                      : "Ask about your document…"
             }
             disabled={loading || summarizing || isListening}
             className="flex-1 pl-3 pr-10 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
@@ -337,11 +504,10 @@ export function ChatInterface({
             type="button"
             onClick={toggleListening}
             disabled={loading || summarizing}
-            className={`absolute right-12 top-1.5 p-1.5 rounded-md transition-colors ${
-              isListening
-                ? "text-red-600 bg-red-100 animate-pulse"
-                : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-            } disabled:opacity-50`}
+            className={`absolute right-12 top-1.5 p-1.5 rounded-md transition-colors ${isListening
+              ? "text-red-600 bg-red-100 animate-pulse"
+              : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              } disabled:opacity-50`}
             title={isListening ? "Stop listening" : "Start dictating"}
           >
             <Mic className="w-4 h-4" />

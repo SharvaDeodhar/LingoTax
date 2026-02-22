@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronRight, FileText } from "lucide-react";
-import type { ChunkSource } from "@/types";
+import type { Source } from "@/types";
 
 interface SourceCitationsProps {
-  sources: ChunkSource[];
+  sources: Source[];
 }
 
 export function SourceCitations({ sources }: SourceCitationsProps) {
@@ -31,30 +31,34 @@ export function SourceCitations({ sources }: SourceCitationsProps) {
         <div className="mt-2 space-y-2">
           {sources.map((src, i) => (
             <div
-              key={src.chunk_id ?? i}
-              className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs"
+              key={i}
+              className="p-3 bg-white border border-gray-100 rounded-lg shadow-sm text-xs relative group"
             >
-              <div className="flex items-center gap-1.5 text-blue-700 font-medium mb-1">
-                <FileText className="w-3 h-3" />
+              <div className="flex items-center gap-1.5 text-gray-700 font-medium mb-1">
+                <FileText className="w-3 h-3 text-blue-500" />
                 {src.page ? `Page ${src.page}` : "Document excerpt"}
-                {src.similarity > 0 && (
-                  <span className="ml-auto text-blue-400">
-                    {Math.round(src.similarity * 100)}% match
+                {src.label && (
+                  <span className="ml-2 px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[9px] uppercase tracking-wide">
+                    {src.label}
                   </span>
                 )}
+
+                {/* Jump to Page button - assumes parent or PDF viewer can handle this via event/storage */}
+                <button
+                  onClick={() => {
+                    if (src.page) {
+                      // Custom event for PdfViewer to catch
+                      window.dispatchEvent(new CustomEvent('jump-to-page', { detail: { page: src.page } }));
+                    }
+                  }}
+                  className="ml-auto text-blue-600 hover:text-blue-800 font-semibold opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  Jump to page
+                </button>
               </div>
-              <p className="text-gray-600 leading-relaxed">{src.chunk_text}</p>
-              {src.form_fields && Object.keys(src.form_fields).length > 0 && (
-                <div className="mt-2 pt-2 border-t border-blue-100">
-                  <p className="text-blue-700 font-medium mb-1">Form fields:</p>
-                  {Object.entries(src.form_fields).map(([k, v]) => (
-                    <div key={k} className="flex gap-2">
-                      <span className="text-gray-500">{k}:</span>
-                      <span className="text-gray-700 font-medium">{v}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <p className="text-gray-600 leading-relaxed italic line-clamp-2 hover:line-clamp-none transition-all">
+                &ldquo;{src.snippet}&rdquo;
+              </p>
             </div>
           ))}
         </div>

@@ -194,11 +194,10 @@ export function TaskDetailView({
 
                         {/* Drop zone */}
                         <div
-                            className={`border-2 border-dashed rounded-xl p-10 text-center transition-colors ${
-                                uploading
+                            className={`border-2 border-dashed rounded-xl p-10 text-center transition-colors ${uploading
                                     ? "border-gray-200 bg-gray-50 cursor-not-allowed"
                                     : "border-gray-300 hover:border-blue-400 hover:bg-blue-50 cursor-pointer"
-                            }`}
+                                }`}
                             onClick={() => {
                                 if (uploading) return;
                                 const input = window.document.createElement("input");
@@ -285,6 +284,7 @@ export function TaskDetailView({
                         <ChatInterface
                             document={document}
                             preferredLanguage={preferredLanguage}
+                            autoSummarize={true}
                         />
                     </div>
 

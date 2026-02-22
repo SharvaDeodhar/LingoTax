@@ -56,3 +56,26 @@ def retrieve_all_chunks(
         .execute()
     )
     return result.data or []
+
+
+def deduplicate_sources(chunks: List[dict], max_count: int = 3) -> List[dict]:
+    """
+    Remove near-duplicate snippets and cap the total number of sources.
+    Deduplicates by combining page number and normalized chunk prefix.
+    """
+    seen = set()
+    unique = []
+    
+    for c in chunks:
+        if len(unique) >= max_count:
+            break
+            
+        page = c["metadata"].get("page", 0)
+        snippet = c["chunk_text"][:50].strip().lower()
+        key = f"{page}:{snippet}"
+        
+        if key not in seen:
+            seen.add(key)
+            unique.append(c)
+            
+    return unique

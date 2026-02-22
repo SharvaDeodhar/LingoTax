@@ -288,12 +288,11 @@ export interface Document {
 
 // ─── Chat ─────────────────────────────────────────────────────────────────────
 
-export interface ChunkSource {
-  chunk_id: string;
-  chunk_text: string;
+export interface Source {
   page: number | null;
-  form_fields: Record<string, string>;
-  similarity: number;
+  snippet: string;
+  label?: string | null;
+  doc_id?: string;
 }
 
 export interface ChatMessage {
@@ -303,12 +302,13 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   lang: string;
-  sources?: any[];
+  sources?: Source[];
   images?: { data: string; mime_type: string }[];
   plan?: string;
   hasPlan?: boolean;
   showPlan?: boolean;
   isThinking?: boolean;
+  statusStage?: string; // e.g. "reading_document", "checking_rag_db"
   status?: "thinking" | "responding" | "done";
   thinkingStartTime?: number;
   thinkingDuration?: number;
@@ -328,7 +328,7 @@ export interface Chat {
 export interface ChatApiResponse {
   chat_id: string;
   answer: string;
-  sources: ChunkSource[];
+  sources: Source[];
 }
 
 export interface TaskRecommendationsResponse {

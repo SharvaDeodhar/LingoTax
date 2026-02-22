@@ -227,7 +227,11 @@ export function TaskWorkspace({
           {/* Right: chatbot */}
           <div className="md:w-1/2 flex flex-col">
             {doc && doc.ingest_status === "ready" ? (
-              <ChatInterface document={doc} preferredLanguage={preferredLanguage} />
+              <ChatInterface
+                document={doc}
+                preferredLanguage={preferredLanguage}
+                autoSummarize={true}
+              />
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
                 <IngestStatusBadge status={doc?.ingest_status ?? "pending"} />
