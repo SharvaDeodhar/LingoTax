@@ -100,7 +100,7 @@ export function GeneralChatInterface({
         created_at: new Date().toISOString(),
       };
 
-      setMessages((prev) => [...prev, userMessage]);
+      setMessages((prev: ChatMessage[]) => [...prev, userMessage]);
       setQuestion("");
       const sentImages = [...attachedImages]; // copy to clear later but potentially retry on error?
       setAttachedImages([]); // clear UI
@@ -133,7 +133,7 @@ export function GeneralChatInterface({
         created_at: new Date().toISOString(),
       };
 
-      setMessages((prev) => [...prev, assistantMessage]);
+      setMessages((prev: ChatMessage[]) => [...prev, assistantMessage]);
 
       let done = false;
       let buffer = "";
@@ -197,8 +197,8 @@ export function GeneralChatInterface({
               }
 
               // Update the specific message in the react state
-              setMessages((prev) =>
-                prev.map((m) =>
+              setMessages((prev: ChatMessage[]) =>
+                prev.map((m: ChatMessage) =>
                   m.id === assistantMessage.id ? { ...assistantMessage } : m
                 )
               );
@@ -246,9 +246,9 @@ export function GeneralChatInterface({
 
   const removeAttachedImage = (id: string) => {
     setAttachedImages(prev => {
-      const idx = prev.findIndex(img => img.id === id);
+      const idx = prev.findIndex((img: any) => img.id === id);
       if (idx !== -1) URL.revokeObjectURL(prev[idx].previewUrl);
-      return prev.filter(img => img.id !== id);
+      return prev.filter((img: any) => img.id !== id);
     });
   };
 

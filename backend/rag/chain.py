@@ -46,8 +46,11 @@ _SYSTEM_PROMPT = """\
 You are LinguaTax, a friendly and knowledgeable US tax assistant.
 The user's preferred language is {language}. You MUST respond entirely in {language}.
 
+{profile_context}
+(If AI Deduction Predictions are provided above, explain specifically WHY the user qualifies for them based on the provided rationales and their document context. Do not just list them—explain them naturally in {language}.)
+
 You have been provided with excerpts from the user's tax document.
-Answer the user's question based ONLY on the provided document context.
+Answer the user's question based on the provided document context and their profile.
 
 Structure EVERY answer in exactly this format (translated into {language}):
 
@@ -67,6 +70,7 @@ and suggest the user check the relevant section of the form directly.
 {context}
 --- End of context ---\
 """
+
 
 _llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
@@ -91,11 +95,12 @@ The user's preferred language is {language}. You MUST respond entirely in {langu
 
 The user is seeking expert guidance on US taxes, credits, and compliance.
 {profile_context}
+(If AI Deduction Predictions are provided above, explicitly instruct the user about these specific deductions in {language} and explain WHY they qualify based on the provided rationales.)
 
 Your Core Tenets:
 1. **Unrivaled Depth**: Before answering, perform a comprehensive mental RAG of IRS Internal Revenue Code (IRC) and Treasury Regulations relevant to the topic.
 2. **Precision & Clarity**: Explain complex rules in simple, elegant {language}. Always include official English technical terms in parentheses (e.g., "Earned Income Tax Credit").
-3. **Contextual Tailoring**: Use every detail of the user's profile ({profile_context}) to provide hyper-relevant advice.
+3. **Contextual Tailoring**: Use every detail of the user's profile to provide hyper-relevant advice.
 4. **Form-Centricity**: Be the ultimate guide for IRS forms (W-2, 1040, 1099-NEC/MISC, 1098, 8812, etc.). Detail exactly which boxes and lines are affected.
 5. **Action-Oriented Strategy**: Provide a clear, step-by-step roadmap for the user to follow.
 
@@ -251,6 +256,7 @@ def answer_question(
     question: str,
     chunks: List[dict],
     language_code: str = "en",
+    profile_summary: str = "",
 ) -> str:
     """
     Generate a multilingual RAG answer.
@@ -260,6 +266,13 @@ def answer_question(
     language_code: BCP-47 code, e.g. "es", "hi", "zh-Hans"
     """
     language_name = LANG_CODE_TO_NAME.get(language_code, "English")
+
+    profile_context = ""
+    if profile_summary:
+        profile_context = (
+            "Here is what we know about this user's tax situation:\n"
+            f"{profile_summary}\n"
+        )
 
     context = "\\n\\n---\\n\\n".join(
         [f"[Page {c['metadata'].get('page', '?')}] {c['chunk_text']}" for c in chunks]
@@ -273,8 +286,10 @@ def answer_question(
             "question": question,
             "context": context,
             "language": language_name,
+            "profile_context": profile_context,
         }
     )
+
 
 
 def answer_general_tax_question(
@@ -486,7 +501,8 @@ async def stream_document_chat(
     language_code: str = "en",
     is_summary: bool = False,
     db: Optional[Client] = None,
-    document_id: Optional[str] = None
+    document_id: Optional[str] = None,
+    profile_summary: str = ""
 ):
     """
     Generate an async streaming response for document-specific chat or auto-summary.
@@ -555,12 +571,20 @@ async def stream_document_chat(
                 except Exception as e:
                     print(f"[HIGHLIGHT] Error during field extraction: {e}")
 
+        profile_context = ""
+        if profile_summary:
+            profile_context = (
+                "Here is what we know about this user's tax situation:\n"
+                f"{profile_summary}\n"
+            )
+
         yield {"type": "status", "stage": "writing_answer"}
         async for chunk in _rag_chain.astream(
             {
                 "question": question,
                 "context": context,
                 "language": language_name,
+                "profile_context": profile_context,
             }
         ):
             yield {"type": "answer_token", "text": chunk}

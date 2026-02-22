@@ -1,14 +1,23 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from config import settings
 from routers import documents, chat, tasks
+from services.gnn_service import gnn_service
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    gnn_service.initialize()
+    yield
 
 app = FastAPI(
     title="LinguaTax API",
     version="1.0.0",
     description="Multilingual US tax assistant — FastAPI backend with LangChain + Gemini RAG",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

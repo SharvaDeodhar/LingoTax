@@ -32,6 +32,7 @@ export function ChatInterface({
   const [isListening, setIsListening] = useState(false);
 
   const STAGE_LABELS: Record<string, string> = {
+    calling_gnn: "Calling AI Model…",
     reading_document: "Reading document…",
     building_chunks: "Building chunks…",
     checking_rag_db: "Checking RAG database…",
@@ -250,7 +251,7 @@ export function ChatInterface({
       created_at: new Date().toISOString(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages((prev: ChatMessage[]) => [...prev, userMessage]);
     setQuestion("");
     setLoading(true);
     setError(null);
@@ -283,7 +284,7 @@ export function ChatInterface({
         created_at: new Date().toISOString(),
       };
 
-      setMessages((prev) => [...prev, assistantMessage]);
+      setMessages((prev: ChatMessage[]) => [...prev, assistantMessage]);
 
       let done = false;
       let buffer = "";
@@ -330,8 +331,8 @@ export function ChatInterface({
                 setStatusStage(null);
                 done = true;
               }
-              setMessages((prev) =>
-                prev.map((m) =>
+              setMessages((prev: ChatMessage[]) =>
+                prev.map((m: ChatMessage) =>
                   m.id === assistantMessage.id ? { ...assistantMessage } : m
                 )
               );
