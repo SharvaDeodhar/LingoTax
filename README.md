@@ -1,4 +1,4 @@
-# LingoTax: Empowering Immigrants to Navigate US Taxes in Any Language
+# LinguaTax: Empowering Immigrants to Navigate US Taxes in Any Language
 
 **Bridging the gap between complex IRS regulations and multilingual accessibility through Graph Neural Networks and RAG-powered LLMs.**
 
@@ -19,6 +19,9 @@ Anish n em
 
 ## Team Members:
 Sharva Deodhar, Shirish Parasa, Anish Kajan, Tejas Naik
+## Youtube Link:
+https://youtu.be/Y_lS2gHXdqQ
+
 
 ## 📖 Table of Contents
 - [The Problem](#the-problem)
