@@ -7,6 +7,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { FileUploadZone } from "@/components/files/FileUploadZone";
 import { ChatInterface } from "@/components/chat/ChatInterface";
 import { IngestStatusBadge } from "@/components/files/IngestStatusBadge";
+import { PdfViewer } from "@/components/task/PdfViewer";
 import { CURRENT_FILING_YEAR } from "@/lib/constants";
 import type { Document, Task, TaskDocument } from "@/types";
 
@@ -156,17 +157,36 @@ export function TaskWorkspace({
         </div>
       ) : (
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-          {/* Left: document viewer + notes */}
-          <div className="md:w-1/2 border-r flex flex-col overflow-hidden">
-            <div className="px-4 py-3 border-b bg-gray-50 flex items-center justify-between">
+          {/* Left: chatbot (40%) */}
+          <div className="md:w-[40%] border-r flex flex-col">
+            {doc && doc.ingest_status === "ready" ? (
+              <ChatInterface
+                document={doc}
+                preferredLanguage={preferredLanguage}
+                autoSummarize={true}
+              />
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                <IngestStatusBadge status={doc?.ingest_status ?? "pending"} />
+                <p className="mt-3 text-sm font-medium text-gray-700">
+                  Preparing your document for chat
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground max-w-xs">
+                  Once processing is complete, you&apos;ll be able to ask questions about
+                  this document in your preferred language.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Right: document viewer + notes (60%) */}
+          <div className="md:w-[60%] flex flex-col overflow-hidden bg-gray-50">
+            <div className="px-4 py-3 border-b flex items-center justify-between bg-white shrink-0">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-blue-500" />
                 <div>
                   <p className="text-xs font-medium truncate max-w-[220px]">
                     {doc?.filename}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Reference viewer — the PDF itself is read-only here.
                   </p>
                 </div>
               </div>
@@ -174,12 +194,11 @@ export function TaskWorkspace({
                 <IngestStatusBadge status={doc.ingest_status} />
               )}
             </div>
-            <div className="flex-1 overflow-hidden bg-gray-100">
+            <div className="flex-1 overflow-hidden relative">
               {pdfUrl ? (
-                <iframe
-                  src={pdfUrl}
-                  className="w-full h-full border-0"
-                  title={doc?.filename ?? "Document"}
+                <PdfViewer
+                  url={pdfUrl}
+                  documentId={doc?.id ?? ""}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
@@ -190,7 +209,7 @@ export function TaskWorkspace({
             </div>
 
             {/* Notes / progress */}
-            <div className="border-t bg-white p-4">
+            <div className="border-t bg-white p-4 shrink-0">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold text-gray-700">
                   Notes &amp; progress
@@ -217,33 +236,11 @@ export function TaskWorkspace({
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-                placeholder="Keep track of which boxes you’ve filled, questions to ask, or anything else you want to remember for this document."
+                rows={2}
+                placeholder="Keep track of which boxes you’ve filled, questions to ask, or anything else you want to remember..."
                 className="w-full text-xs border border-gray-300 rounded-lg px-2 py-1.5 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-          </div>
-
-          {/* Right: chatbot */}
-          <div className="md:w-1/2 flex flex-col">
-            {doc && doc.ingest_status === "ready" ? (
-              <ChatInterface
-                document={doc}
-                preferredLanguage={preferredLanguage}
-                autoSummarize={true}
-              />
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-                <IngestStatusBadge status={doc?.ingest_status ?? "pending"} />
-                <p className="mt-3 text-sm font-medium text-gray-700">
-                  Preparing your document for chat
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground max-w-xs">
-                  Once processing is complete, you&apos;ll be able to ask questions about
-                  this document in your preferred language.
-                </p>
-              </div>
-            )}
           </div>
         </div>
       )}

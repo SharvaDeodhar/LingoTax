@@ -9,21 +9,10 @@ import {
     ingestDocument,
     getDocumentSignedUrl,
 } from "@/lib/api/fastapi";
-import dynamic from "next/dynamic";
+import { PdfViewer } from "@/components/task/PdfViewer";
 import { ChatInterface } from "@/components/chat/ChatInterface";
 import { CURRENT_FILING_YEAR } from "@/lib/constants";
 
-const PdfViewer = dynamic(
-    () => import("@/components/task/PdfViewer").then((m) => m.PdfViewer),
-    {
-        ssr: false,
-        loading: () => (
-            <div className="flex-1 flex items-center justify-center">
-                <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
-            </div>
-        ),
-    }
-);
 import type { Task, Document as DocType, IngestStatus } from "@/types";
 
 type Phase = "upload" | "processing" | "ready";

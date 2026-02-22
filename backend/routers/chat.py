@@ -17,6 +17,7 @@ import asyncio
 from supabase import Client
 from dependencies import get_current_user_id, get_user_supabase
 
+from rag.highlightExtractor import find_field_location
 from rag.retriever import retrieve_chunks, deduplicate_sources, retrieve_all_chunks
 from rag.chain import (
     answer_question,
@@ -24,6 +25,7 @@ from rag.chain import (
     summarize_document_sections,
     stream_general_tax_question,
     stream_document_chat,
+    check_for_highlight
 )
 from langchain_core.messages import HumanMessage, AIMessage
 
@@ -129,7 +131,9 @@ async def chat(
                 question=req.question,
                 chunks=chunks,
                 language_code=req.language,
-                is_summary=False
+                is_summary=False,
+                db=db,
+                document_id=req.document_id
             ):
                 if event["type"] == "answer_token":
                     full_answer += event["text"]

@@ -36,6 +36,7 @@ export function ChatInterface({
     building_chunks: "Building chunks…",
     checking_rag_db: "Checking RAG database…",
     selecting_sources: "Selecting sources…",
+    preparing_highlight: "Preparing highlight…",
     writing_answer: "Writing answer…",
   };
 
@@ -308,6 +309,14 @@ export function ChatInterface({
               if (data.type === "sources") {
                 assistantMessage.sources = data.sources;
               }
+              if (data.type === "highlight" && data.highlight) {
+                console.log("[HIGHLIGHT] Received highlight event:", data.highlight);
+                assistantMessage.highlight = data.highlight;
+                // Dispatch event to tell the PDF viewer to jump & show overlay
+                window.dispatchEvent(
+                  new CustomEvent("show-highlight", { detail: data.highlight })
+                );
+              }
               if (data.type === "answer_token") {
                 assistantMessage.status = "responding";
                 assistantMessage.isThinking = false;
@@ -348,9 +357,8 @@ export function ChatInterface({
     }
 
     try {
-      // @ts-ignore
       const SpeechRecognition =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
       if (!SpeechRecognition) {
         setError("Speech recognition is not supported in this browser.");
