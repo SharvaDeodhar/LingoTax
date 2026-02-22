@@ -163,6 +163,9 @@ export function ChatInterface({
           lang: language,
           sources: [],
           status: "thinking",
+          isThinking: true,
+          hasPlan: false,
+          thinkingStartTime: Date.now(),
           created_at: new Date().toISOString(),
         };
 
@@ -194,6 +197,10 @@ export function ChatInterface({
                 }
                 if (data.type === "answer_token") {
                   assistantMessage.status = "responding";
+                  assistantMessage.isThinking = false;
+                  if (assistantMessage.thinkingStartTime && !assistantMessage.thinkingDuration) {
+                    assistantMessage.thinkingDuration = Math.round((Date.now() - assistantMessage.thinkingStartTime) / 1000);
+                  }
                   assistantMessage.content += data.text;
                 }
                 if (data.type === "done") {
@@ -269,6 +276,9 @@ export function ChatInterface({
         lang: language,
         sources: [],
         status: "thinking",
+        isThinking: true,
+        hasPlan: false,
+        thinkingStartTime: Date.now(),
         created_at: new Date().toISOString(),
       };
 
@@ -300,6 +310,10 @@ export function ChatInterface({
               }
               if (data.type === "answer_token") {
                 assistantMessage.status = "responding";
+                assistantMessage.isThinking = false;
+                if (assistantMessage.thinkingStartTime && !assistantMessage.thinkingDuration) {
+                  assistantMessage.thinkingDuration = Math.round((Date.now() - assistantMessage.thinkingStartTime) / 1000);
+                }
                 assistantMessage.content += data.text;
               }
               if (data.type === "done") {
@@ -436,38 +450,6 @@ export function ChatInterface({
         {messages.map((msg) => (
           <MessageBubble key={msg.id} message={msg} />
         ))}
-
-        {(loading || summarizing || statusStage || (doc && ingestStatus !== "ready")) && (
-          <div className="flex justify-start">
-            <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground mr-1">
-                  {statusStage
-                    ? STAGE_LABELS[statusStage as keyof typeof STAGE_LABELS]
-                    : ingestStatus !== "ready"
-                      ? "Analyzing document…"
-                      : loading
-                        ? "Thinking…"
-                        : "Reading document…"}
-                </span>
-                <div className="flex gap-1">
-                  <span
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "0ms" }}
-                  />
-                  <span
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "150ms" }}
-                  />
-                  <span
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "300ms" }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         <div ref={bottomRef} />
       </div>

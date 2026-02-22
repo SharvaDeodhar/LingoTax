@@ -468,6 +468,7 @@ async def stream_document_chat(
             }
         ):
             yield {"type": "answer_token", "text": chunk}
+            await asyncio.sleep(0.01)
     else:
         yield {"type": "status", "stage": "checking_rag_db"}
         await asyncio.sleep(0.6)
@@ -488,5 +489,6 @@ async def stream_document_chat(
             }
         ):
             yield {"type": "answer_token", "text": chunk}
+            await asyncio.sleep(0.01)
 
     yield {"type": "done"}

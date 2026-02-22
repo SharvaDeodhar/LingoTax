@@ -494,7 +494,6 @@ async def summarize_document(
                 "content": full_answer,
                 "lang": req.language,
                 "sources": sources,
-                "metadata": {"auto_summary": True}
             }
         ).execute()
 
