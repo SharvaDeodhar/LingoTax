@@ -36,6 +36,7 @@ export async function createDocument(payload: {
   mime_type: string;
   file_size_bytes: number;
   filing_year: number;
+  task_id?: string;
 }): Promise<Document> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${FASTAPI_URL}/documents/create`, {
@@ -69,10 +70,22 @@ export async function listDocuments(filingYear = 2024): Promise<Document[]> {
   return res.json();
 }
 
+export async function getDocumentSignedUrl(
+  documentId: string
+): Promise<{ signed_url: string }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(
+    `${FASTAPI_URL}/documents/${documentId}/signed-url`,
+    { headers }
+  );
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 // ─── Chat ─────────────────────────────────────────────────────────────────────
 
 export async function sendChatMessage(payload: {
-  document_id: string;
+  document_id?: string;   // omit for general tax help chat (no document required)
   chat_id?: string;
   question: string;
   language: string;
@@ -96,6 +109,18 @@ export async function getTaskRecommendations(
   const res = await fetch(
     `${FASTAPI_URL}/tasks/recommendations?filing_year=${filingYear}`,
     { headers }
+  );
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function generateTasks(
+  filingYear = 2024
+): Promise<{ created: number; skipped: number }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(
+    `${FASTAPI_URL}/tasks/generate?filing_year=${filingYear}`,
+    { method: "POST", headers }
   );
   if (!res.ok) throw new Error(await res.text());
   return res.json();

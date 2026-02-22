@@ -64,7 +64,7 @@ and suggest the user check the relevant section of the form directly.
 """
 
 _llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash",
+    model="gemini-2.5-flash",
     google_api_key=settings.gemini_api_key,
     temperature=0.2,
     max_output_tokens=2048,
@@ -109,5 +109,55 @@ def answer_question(
             "question": question,
             "context": context,
             "language": language_name,
+        }
+    )
+
+
+_GENERAL_SYSTEM_PROMPT = """\
+You are LingoTax, a friendly and knowledgeable US tax assistant for US immigrants and visa holders.
+The user's preferred language is {language}. You MUST respond entirely in {language}.
+
+Answer the user's US tax question clearly and helpfully based on your knowledge.
+{profile_context}
+If you're not certain about something, say so and suggest the user consult a licensed CPA or tax attorney.
+Keep your answer concise but complete.\
+"""
+
+_general_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", _GENERAL_SYSTEM_PROMPT),
+        ("human", "{question}"),
+    ]
+)
+
+_general_chain = _general_prompt | _llm | StrOutputParser()
+
+
+def answer_general_question(
+    question: str,
+    language_code: str = "en",
+    questionnaire_context: str = "",
+) -> str:
+    """
+    Answer a general US tax question without document context.
+    Optionally accepts a brief questionnaire summary for personalization.
+
+    question: user's question (any language)
+    language_code: BCP-47 code, e.g. "es", "hi"
+    questionnaire_context: short plain-text summary of user's tax profile
+    """
+    language_name = LANG_CODE_TO_NAME.get(language_code, "English")
+
+    profile_section = (
+        f"User's tax profile context: {questionnaire_context}"
+        if questionnaire_context
+        else ""
+    )
+
+    return _general_chain.invoke(
+        {
+            "question": question,
+            "language": language_name,
+            "profile_context": profile_section,
         }
     )

@@ -6,6 +6,8 @@ POST /documents/{id}/ingest  – Trigger async ingestion pipeline (extract→chu
 GET  /documents              – List user's documents
 """
 
+from typing import Optional
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from supabase import Client
@@ -21,10 +23,11 @@ router = APIRouter()
 
 class CreateDocumentRequest(BaseModel):
     filename: str
-    storage_path: str       # path already uploaded in tax-docs bucket
+    storage_path: str               # path already uploaded in tax-docs bucket
     mime_type: str = "application/pdf"
     file_size_bytes: int = 0
     filing_year: int = 2024
+    task_id: Optional[str] = None   # optional link to a task that prompted this upload
 
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
@@ -40,21 +43,19 @@ async def create_document(
     Creates the documents row with status='pending'.
     Returns the new document record.
     """
-    result = (
-        db.table("documents")
-        .insert(
-            {
-                "user_id": user_id,
-                "filename": req.filename,
-                "storage_path": req.storage_path,
-                "mime_type": req.mime_type,
-                "file_size_bytes": req.file_size_bytes,
-                "ingest_status": "pending",
-                "filing_year": req.filing_year,
-            }
-        )
-        .execute()
-    )
+    row: dict = {
+        "user_id": user_id,
+        "filename": req.filename,
+        "storage_path": req.storage_path,
+        "mime_type": req.mime_type,
+        "file_size_bytes": req.file_size_bytes,
+        "ingest_status": "pending",
+        "filing_year": req.filing_year,
+    }
+    if req.task_id:
+        row["task_id"] = req.task_id
+
+    result = db.table("documents").insert(row).execute()
     if not result.data:
         raise HTTPException(status_code=500, detail="Failed to create document record")
     return result.data[0]
@@ -107,6 +108,22 @@ async def list_documents(
         .execute()
     )
     return result.data or []
+
+
+@router.get("/{document_id}/signed-url")
+async def get_signed_url(
+    document_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: Client = Depends(get_user_supabase),
+    service_db: Client = Depends(get_service_supabase),
+):
+    """Generate a temporary signed URL for viewing a PDF in the browser."""
+    doc = db.table("documents").select("storage_path").eq("id", document_id).maybe_single().execute()
+    if not doc.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    signed_url = storage_service.create_signed_url(service_db, doc.data["storage_path"])
+    return {"signed_url": signed_url}
 
 
 # ─── Background ingestion pipeline ───────────────────────────────────────────

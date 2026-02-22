@@ -2,7 +2,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PROTECTED_PATHS = ["/dashboard", "/files", "/profile", "/settings"];
+const PROTECTED_PATHS = ["/dashboard", "/files", "/profile", "/settings", "/help"];
 const AUTH_ONLY_PATHS = ["/login", "/signup", "/verify-otp", "/forgot-password", "/reset-password"];
 // Must remain public — OAuth/OTP flows redirect here
 const PUBLIC_API_PATHS = ["/api/auth/callback"];

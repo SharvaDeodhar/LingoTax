@@ -219,6 +219,8 @@ export interface Task {
   status: TaskStatus;
   filing_year: number;
   sort_order: number;
+  form_code: string | null;
+  auto_generated: boolean;
   created_at: string;
   updated_at: string;
   task_groups?: TaskGroup;
@@ -260,6 +262,7 @@ export interface Document {
   ingest_status: IngestStatus;
   error_message: string | null;
   filing_year: number;
+  task_id: string | null;
   created_at: string;
   updated_at: string;
 }

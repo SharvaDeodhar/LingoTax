@@ -9,11 +9,13 @@ import { LanguageSelector } from "./LanguageSelector";
 import type { ChatMessage, Document } from "@/types";
 
 interface ChatInterfaceProps {
-  document: Document;
+  document?: Document;          // omit for general tax help mode
   preferredLanguage: string;
 }
 
 export function ChatInterface({ document: doc, preferredLanguage }: ChatInterfaceProps) {
+  const isGeneralMode = !doc;
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatId, setChatId] = useState<string | undefined>();
   const [language, setLanguage] = useState(preferredLanguage);
@@ -27,13 +29,19 @@ export function ChatInterface({ document: doc, preferredLanguage }: ChatInterfac
   // Load existing chat history
   useEffect(() => {
     async function loadHistory() {
-      const { data: chats } = await supabase
+      let query = supabase
         .from("chats")
         .select("id")
-        .eq("document_id", doc.id)
         .order("created_at", { ascending: false })
         .limit(1);
 
+      if (doc) {
+        query = query.eq("document_id", doc.id);
+      } else {
+        query = query.is("document_id", null);
+      }
+
+      const { data: chats } = await query;
       if (!chats || chats.length === 0) return;
 
       const existingChatId = chats[0].id;
@@ -49,7 +57,8 @@ export function ChatInterface({ document: doc, preferredLanguage }: ChatInterfac
     }
 
     loadHistory();
-  }, [doc.id, supabase]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc?.id]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -78,7 +87,7 @@ export function ChatInterface({ document: doc, preferredLanguage }: ChatInterfac
 
     try {
       const response = await sendChatMessage({
-        document_id: doc.id,
+        ...(doc ? { document_id: doc.id } : {}),
         chat_id: chatId,
         question: userMessage.content,
         language,
@@ -110,8 +119,17 @@ export function ChatInterface({ document: doc, preferredLanguage }: ChatInterfac
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-white">
         <div>
-          <p className="text-sm font-medium truncate max-w-[250px]">{doc.filename}</p>
-          <p className="text-xs text-muted-foreground">Ask anything about this document</p>
+          {isGeneralMode ? (
+            <>
+              <p className="text-sm font-medium">General Tax Help</p>
+              <p className="text-xs text-muted-foreground">Ask any US tax question</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-medium truncate max-w-[250px]">{doc!.filename}</p>
+              <p className="text-xs text-muted-foreground">Ask anything about this document</p>
+            </>
+          )}
         </div>
         <LanguageSelector value={language} onChange={setLanguage} />
       </div>
@@ -120,8 +138,17 @@ export function ChatInterface({ document: doc, preferredLanguage }: ChatInterfac
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
         {messages.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
-            <p className="text-sm font-medium mb-2">Start chatting about your document</p>
-            <p className="text-xs">Try: &quot;What are my wages?&quot; or &quot;What is Box 2?&quot;</p>
+            {isGeneralMode ? (
+              <>
+                <p className="text-sm font-medium mb-2">Ask any US tax question</p>
+                <p className="text-xs">Try: &quot;Do I need to file Form 8843?&quot; or &quot;What is a W-2?&quot;</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium mb-2">Start chatting about your document</p>
+                <p className="text-xs">Try: &quot;What are my wages?&quot; or &quot;What is Box 2?&quot;</p>
+              </>
+            )}
           </div>
         )}
         {messages.map((msg) => (
@@ -155,7 +182,11 @@ export function ChatInterface({ document: doc, preferredLanguage }: ChatInterfac
             type="text"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Ask about your document…"
+            placeholder={
+              isGeneralMode
+                ? "Ask a tax question…"
+                : "Ask about your document…"
+            }
             disabled={loading}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
           />
