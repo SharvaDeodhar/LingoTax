@@ -115,6 +115,7 @@ async def get_signed_url(
     document_id: str,
     user_id: str = Depends(get_current_user_id),
     db: Client = Depends(get_user_supabase),
+    service_db: Client = Depends(get_service_supabase),
 ):
     """
     Return a temporary signed URL (1 hour) for reading the PDF in-browser.
@@ -130,10 +131,17 @@ async def get_signed_url(
     if not doc.data:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    signed = storage_service.create_signed_url(
-        db, doc.data["storage_path"], expires_in=3600
-    )
-    return {"signed_url": signed}
+    try:
+        # Use service_db to bypass potential RLS issues on signed URL generation
+        signed = storage_service.create_signed_url(
+            service_db, doc.data["storage_path"], expires_in=3600
+        )
+        return {"signed_url": signed}
+    except Exception as e:
+        # If storage says "Object not found", return a clean 404
+        if "Object not found" in str(e) or "400" in str(e):
+            raise HTTPException(status_code=404, detail="PDF file missing from storage")
+        raise HTTPException(status_code=500, detail=f"Storage error: {str(e)}")
 
 
 @router.post("/{document_id}/save-pdf")
