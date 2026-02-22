@@ -1,0 +1,39 @@
+{
+  "generated_at": "2026-02-22T07:42:32.717339+00:00",
+  "n": 20000,
+  "seed": 42,
+  "distribution_aware": true,
+  "noise_rate": 0.05,
+  "deduction_counts": {
+    "foreign_tax_credit": 4511,
+    "student_loan_interest": 4705,
+    "standard_deduction": 16731,
+    "earned_income_credit": 10514,
+    "child_tax_credit": 14895,
+    "educator_expense": 2434,
+    "ira_deduction": 4767,
+    "home_ownership_credit": 6793
+  },
+  "columns": [
+    "user_id",
+    "visa_type",
+    "filing_status",
+    "num_dependents",
+    "total_income",
+    "foreign_income",
+    "foreign_tax_paid",
+    "student_loan_interest_paid",
+    "paid_tuition",
+    "owns_home",
+    "state",
+    "years_in_us",
+    "foreign_tax_credit",
+    "student_loan_interest",
+    "standard_deduction",
+    "earned_income_credit",
+    "child_tax_credit",
+    "educator_expense",
+    "ira_deduction",
+    "home_ownership_credit"
+  ]
+}

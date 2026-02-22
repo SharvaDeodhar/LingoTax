@@ -56,7 +56,7 @@ class PredictionResponse(BaseModel):
 # ── App lifecycle ─────────────────────────────────────────────────────────────
 
 # Model paths — override via env vars if stored remotely
-MODEL_PATH = os.getenv("GNN_MODEL_PATH", "model/models/checkpoints/gnn_v1.pt")
+MODEL_PATH = os.getenv("GNN_MODEL_PATH", str(Path(__file__).resolve().parent.parent / "models" / "checkpoints" / "gnn_v1.pt"))
 # NOTE: To download model from Google Drive or Supabase Storage on startup:
 #   1. Check if MODEL_PATH exists on disk.
 #   2. If not, download from https://<your-gdrive-or-supabase-url>
