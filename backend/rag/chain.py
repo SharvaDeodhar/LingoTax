@@ -8,6 +8,7 @@ The system prompt instructs Gemini to:
 
 import json
 import asyncio
+from supabase import Client
 from typing import List, Optional, Dict, Any
 
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -16,6 +17,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.messages import HumanMessage
 
 from config import settings
+from rag.highlightExtractor import find_field_location
 
 # BCP-47 code → language name for injection into the system prompt
 LANG_CODE_TO_NAME: dict = {
@@ -203,6 +205,48 @@ async def generate_plan(
 
 
 
+_HIGHLIGHT_SYSTEM_PROMPT = """\
+You are an intent detection layer for a US tax assistant.
+Determine if the user's question is asking "where" to enter a specific piece of information on a tax form.
+
+Focus specifically on phrases like:
+"Where do I put my..."
+"Where do I enter..."
+"Which box is for..."
+"What line do I use for..."
+
+If it is a highlighting request, output a JSON object:
+{{"needs_highlight": true, "field_label": "The specific item they are asking about, e.g., 'first name', 'SSN', 'wages'"}}
+If it is NOT a highlighting request, output:
+{{"needs_highlight": false, "field_label": null}}
+
+Your output must be ONLY valid JSON matching this schema, with no markdown formatting or other text.
+"""
+
+_highlight_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", _HIGHLIGHT_SYSTEM_PROMPT),
+        ("human", "{question}"),
+    ]
+)
+
+_highlight_chain = _highlight_prompt | _llm | StrOutputParser()
+
+
+async def check_for_highlight(question: str) -> dict:
+    """
+    Checks if the question needs a visual highlight and extracts the field label.
+    """
+    try:
+        response = await _highlight_chain.ainvoke({"question": question})
+        # Clean up any potential markdown formatting from the response
+        cleaned = response.replace("```json", "").replace("```", "").strip()
+        data = json.loads(cleaned)
+        return data
+    except Exception as e:
+        print(f"Error checking for highlight: {e}")
+        return {"needs_highlight": False, "field_label": None}
+
 def answer_question(
     question: str,
     chunks: List[dict],
@@ -217,7 +261,7 @@ def answer_question(
     """
     language_name = LANG_CODE_TO_NAME.get(language_code, "English")
 
-    context = "\n\n---\n\n".join(
+    context = "\\n\\n---\\n\\n".join(
         [f"[Page {c['metadata'].get('page', '?')}] {c['chunk_text']}" for c in chunks]
     )
 
@@ -441,6 +485,8 @@ async def stream_document_chat(
     chunks: List[dict],
     language_code: str = "en",
     is_summary: bool = False,
+    db: Optional[Client] = None,
+    document_id: Optional[str] = None
 ):
     """
     Generate an async streaming response for document-specific chat or auto-summary.
@@ -468,16 +514,46 @@ async def stream_document_chat(
             }
         ):
             yield {"type": "answer_token", "text": chunk}
+            await asyncio.sleep(0.01)
     else:
         yield {"type": "status", "stage": "checking_rag_db"}
         await asyncio.sleep(0.6)
 
         yield {"type": "status", "stage": "selecting_sources"}
         # Context from top-k chunks
-        context = "\n\n---\n\n".join(
+        context = "\\n\\n---\\n\\n".join(
             [f"[Page {c['metadata'].get('page', '?')}] {c['chunk_text']}" for c in chunks]
         )
         await asyncio.sleep(0.6)
+        
+        # Check for visual highlight request
+        if db and document_id:
+            yield {"type": "status", "stage": "preparing_highlight"}
+            print(f"[HIGHLIGHT] Checking highlight for question: {question}")
+            highlight_intent = await check_for_highlight(question)
+            print(f"[HIGHLIGHT] Intent result: {highlight_intent}")
+            
+            if highlight_intent.get("needs_highlight") and highlight_intent.get("field_label"):
+                label = highlight_intent["field_label"]
+                print(f"[HIGHLIGHT] Looking for field: {label}")
+                try:
+                    # Try to extract the bounding box from the PDF
+                    location = find_field_location(db, document_id, label)
+                    print(f"[HIGHLIGHT] Location result: {location}")
+                    
+                    if location:
+                        yield {
+                            "type": "highlight",
+                            "highlight": {
+                                "page": location["page"],
+                                "bbox": location["bbox"],
+                                "label": location["label"],
+                                "method": location["method"]
+                            }
+                        }
+                        await asyncio.sleep(0.5)
+                except Exception as e:
+                    print(f"[HIGHLIGHT] Error during field extraction: {e}")
 
         yield {"type": "status", "stage": "writing_answer"}
         async for chunk in _rag_chain.astream(
@@ -488,5 +564,6 @@ async def stream_document_chat(
             }
         ):
             yield {"type": "answer_token", "text": chunk}
+            await asyncio.sleep(0.01)
 
     yield {"type": "done"}

@@ -295,6 +295,13 @@ export interface Source {
   doc_id?: string;
 }
 
+export interface Highlight {
+  page: number;
+  bbox: [number, number, number, number];
+  label?: string;
+  method?: string;
+}
+
 export interface ChatMessage {
   id: string;
   chat_id: string;
@@ -312,6 +319,7 @@ export interface ChatMessage {
   status?: "thinking" | "responding" | "done";
   thinkingStartTime?: number;
   thinkingDuration?: number;
+  highlight?: Highlight;
   created_at: string;
 }
 
