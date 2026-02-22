@@ -1,6 +1,9 @@
+-- Make the vector type visible (pgvector lives in the extensions schema on Supabase)
+SET search_path TO public, extensions;
+
 -- documents: metadata for uploaded tax documents (files live in Supabase Storage)
 CREATE TABLE IF NOT EXISTS documents (
-  id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id          UUID NOT NULL REFERENCES profiles(user_id) ON DELETE CASCADE,
 
   filename         TEXT NOT NULL,
@@ -31,7 +34,7 @@ CREATE TRIGGER trg_documents_updated
 -- document_chunks: text chunks with pgvector embeddings
 -- Dimension 768 matches Gemini text-embedding-004 output
 CREATE TABLE IF NOT EXISTS document_chunks (
-  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   document_id  UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
   user_id      UUID NOT NULL REFERENCES profiles(user_id) ON DELETE CASCADE,
   chunk_index  INT NOT NULL,

@@ -73,8 +73,7 @@ export default async function DashboardPage() {
             Upcoming Forms
           </h2>
           <FormsChecklist
-            checklist={(checklist as UserFormChecklist[]) ?? []}
-            onUpdated={() => {}}
+            initialChecklist={(checklist as UserFormChecklist[]) ?? []}
           />
           {checklist && checklist.length === 0 && questionnaire && (
             <p className="text-xs text-muted-foreground mt-4">

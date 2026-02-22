@@ -1,3 +1,6 @@
+-- Make the vector type visible (pgvector lives in the extensions schema on Supabase)
+SET search_path TO public, extensions;
+
 -- match_chunks: cosine similarity search for RAG retrieval
 -- Called as RPC from FastAPI backend:
 --   supabase.rpc("match_chunks", { query_embedding: [...], doc_id: "uuid", match_count: 5, match_threshold: 0.70 })

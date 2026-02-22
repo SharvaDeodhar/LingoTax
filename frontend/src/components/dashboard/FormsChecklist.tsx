@@ -7,8 +7,7 @@ import { cn } from "@/lib/utils";
 import type { UserFormChecklist, FormChecklistStatus } from "@/types";
 
 interface FormsChecklistProps {
-  checklist: UserFormChecklist[];
-  onUpdated: () => void;
+  initialChecklist: UserFormChecklist[];
 }
 
 const STATUS_CYCLE: Record<FormChecklistStatus, FormChecklistStatus> = {
@@ -23,7 +22,8 @@ const STATUS_CONFIG: Record<FormChecklistStatus, { icon: React.ReactNode; label:
   filed:    { icon: <CheckCircle2 className="w-4 h-4 text-green-500" />,  label: "Filed",    color: "text-green-600" },
 };
 
-export function FormsChecklist({ checklist, onUpdated }: FormsChecklistProps) {
+export function FormsChecklist({ initialChecklist }: FormsChecklistProps) {
+  const [checklist, setChecklist] = useState<UserFormChecklist[]>(initialChecklist);
   const [updating, setUpdating] = useState<string | null>(null);
   const supabase = getSupabaseBrowserClient();
 
@@ -34,7 +34,9 @@ export function FormsChecklist({ checklist, onUpdated }: FormsChecklistProps) {
       .from("user_form_checklist")
       .update({ status: next })
       .eq("id", item.id);
-    onUpdated();
+    setChecklist((prev) =>
+      prev.map((c) => (c.id === item.id ? { ...c, status: next } : c))
+    );
     setUpdating(null);
   }
 

@@ -8,9 +8,8 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
  *   1. OAuth code exchange (Google sign-in / account linking)
  *   2. OTP email redirect (if configured to redirect rather than token)
  *
- * The database trigger handle_new_user() is the SINGLE source of truth
- * for creating profiles rows — this route does NOT upsert profiles.
- * It only checks for profile existence in dev mode to catch trigger failures.
+ * We upsert the profiles row here as a reliable fallback — the database
+ * trigger handle_new_user() may not fire in all Supabase hosted environments.
  */
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -18,7 +17,6 @@ export async function GET(request: NextRequest) {
   const next = requestUrl.searchParams.get("next") ?? "/dashboard";
 
   if (!code) {
-    // No code — might be an error redirect or hash-based flow
     return NextResponse.redirect(new URL("/login?error=no_code", request.url));
   }
 
@@ -50,24 +48,23 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // In development, verify the trigger fired correctly.
-  // Do NOT unconditionally upsert — the trigger is the source of truth.
-  if (process.env.NODE_ENV === "development") {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("user_id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!profile) {
-        console.error(
-          "[auth/callback] Profile trigger did not fire for user:",
-          user.id
-        );
-      }
-    }
+  // Ensure the profiles row exists. The DB trigger handle_new_user() should
+  // have created it, but it can silently fail in Supabase hosted environments.
+  // ignoreDuplicates: true means we never overwrite an existing profile.
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    await supabase.from("profiles").upsert(
+      {
+        user_id: user.id,
+        email: user.email ?? null,
+        full_name:
+          user.user_metadata?.full_name ??
+          user.user_metadata?.name ??
+          null,
+        avatar_url: user.user_metadata?.avatar_url ?? null,
+      },
+      { onConflict: "user_id", ignoreDuplicates: true }
+    );
   }
 
   return response;

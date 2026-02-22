@@ -1,7 +1,7 @@
 -- questionnaires: tax context per user per filing year
 -- NOTE: No preferred_language here — it lives in profiles.preferred_language
 CREATE TABLE IF NOT EXISTS questionnaires (
-  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id           UUID NOT NULL REFERENCES profiles(user_id) ON DELETE CASCADE,
 
   filing_year       INT NOT NULL DEFAULT 2024,

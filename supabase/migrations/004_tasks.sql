@@ -1,6 +1,6 @@
 -- task_groups: global reference table (Personal, Tax Forms, Work Forms, Other)
 CREATE TABLE IF NOT EXISTS task_groups (
-  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name       TEXT NOT NULL UNIQUE,
   sort_order INT NOT NULL DEFAULT 0
 );
@@ -15,7 +15,7 @@ ON CONFLICT (name) DO NOTHING;
 
 -- tasks: user-specific to-do items for a tax season
 CREATE TABLE IF NOT EXISTS tasks (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       UUID NOT NULL REFERENCES profiles(user_id) ON DELETE CASCADE,
   task_group_id UUID REFERENCES task_groups(id) ON DELETE SET NULL,
 

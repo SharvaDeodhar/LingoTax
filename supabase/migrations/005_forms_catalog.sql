@@ -1,6 +1,6 @@
 -- forms_catalog: global reference of US tax forms
 CREATE TABLE IF NOT EXISTS forms_catalog (
-  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   form_code           TEXT NOT NULL UNIQUE,     -- 'W-2', '1099-NEC', 'Form 8843', etc.
   display_name        TEXT NOT NULL,
   description         TEXT,
@@ -29,7 +29,7 @@ ON CONFLICT (form_code) DO NOTHING;
 
 -- user_form_checklist: per-user upcoming forms checklist
 CREATE TABLE IF NOT EXISTS user_form_checklist (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES profiles(user_id) ON DELETE CASCADE,
   form_id     UUID NOT NULL REFERENCES forms_catalog(id) ON DELETE CASCADE,
   filing_year INT NOT NULL DEFAULT 2024,
