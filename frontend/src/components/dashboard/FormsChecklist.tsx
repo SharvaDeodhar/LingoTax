@@ -17,9 +17,9 @@ const STATUS_CYCLE: Record<FormChecklistStatus, FormChecklistStatus> = {
 };
 
 const STATUS_CONFIG: Record<FormChecklistStatus, { icon: React.ReactNode; label: string; color: string }> = {
-  pending:  { icon: <Circle className="w-4 h-4 text-gray-300" />,         label: "Pending",  color: "text-gray-500" },
-  received: { icon: <FileCheck className="w-4 h-4 text-yellow-500" />,    label: "Received", color: "text-yellow-600" },
-  filed:    { icon: <CheckCircle2 className="w-4 h-4 text-green-500" />,  label: "Filed",    color: "text-green-600" },
+  pending:  { icon: <Circle className="w-4 h-4 text-[#E2E8F0]" />,          label: "Pending",  color: "text-[#64748B]" },
+  received: { icon: <FileCheck className="w-4 h-4 text-amber-400" />,        label: "Received", color: "text-amber-600" },
+  filed:    { icon: <CheckCircle2 className="w-4 h-4 text-[#10B981]" />,     label: "Filed",    color: "text-[#10B981]" },
 };
 
 export function FormsChecklist({ initialChecklist }: FormsChecklistProps) {
@@ -43,7 +43,7 @@ export function FormsChecklist({ initialChecklist }: FormsChecklistProps) {
   if (checklist.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-[#64748B]">
           Complete your profile to see recommended forms.
         </p>
       </div>
@@ -61,16 +61,16 @@ export function FormsChecklist({ initialChecklist }: FormsChecklistProps) {
             onClick={() => cycleStatus(item)}
             disabled={updating === item.id}
             className={cn(
-              "w-full flex items-start gap-3 p-3 rounded-lg border text-left transition-colors",
+              "w-full flex items-start gap-3 p-3.5 rounded-xl border text-left transition-all duration-200",
               item.status === "filed"
-                ? "bg-green-50 border-green-100"
-                : "bg-white border-gray-100 hover:border-gray-200"
+                ? "bg-[#10B981]/5 border-[#10B981]/20"
+                : "bg-white border-[#E2E8F0] hover:border-[#2F8AE5]/30 hover:shadow-ct-sm"
             )}
           >
             <span className="mt-0.5 shrink-0">{config.icon}</span>
             <div className="min-w-0">
-              <p className="text-sm font-medium">{form?.form_code ?? "Form"}</p>
-              <p className="text-xs text-muted-foreground truncate">
+              <p className="text-sm font-semibold text-[#0F172A]">{form?.form_code ?? "Form"}</p>
+              <p className="text-xs text-[#64748B] truncate">
                 {form?.display_name}
               </p>
               <p className={cn("text-xs font-medium mt-0.5", config.color)}>

@@ -13,9 +13,9 @@ interface TaskCardProps {
 }
 
 const STATUS_ICONS: Record<TaskStatus, React.ReactNode> = {
-  not_started: <Circle className="w-4 h-4 text-gray-300" />,
-  in_progress: <Clock className="w-4 h-4 text-yellow-500" />,
-  done: <CheckCircle2 className="w-4 h-4 text-green-500" />,
+  not_started: <Circle className="w-4 h-4 text-[#E2E8F0]" />,
+  in_progress: <Clock className="w-4 h-4 text-amber-400" />,
+  done: <CheckCircle2 className="w-4 h-4 text-[#10B981]" />,
 };
 
 const NEXT_STATUS: Record<TaskStatus, TaskStatus> = {
@@ -67,11 +67,11 @@ export function TaskCard({ task, onUpdated }: TaskCardProps) {
     <div
       onClick={handleCardClick}
       className={cn(
-        "flex items-start gap-3 p-3 rounded-lg border transition-colors",
+        "flex items-start gap-3 p-3.5 rounded-xl border transition-all duration-200",
         task.status === "done"
-          ? "bg-green-50 border-green-100"
-          : "bg-white border-gray-100 hover:border-gray-200",
-        isClickable && "cursor-pointer hover:shadow-sm"
+          ? "bg-[#10B981]/5 border-[#10B981]/20"
+          : "bg-white border-[#E2E8F0] hover:border-[#2F8AE5]/30",
+        isClickable && "cursor-pointer hover:-translate-y-0.5 hover:shadow-ct-card"
       )}
     >
       <button
@@ -86,27 +86,27 @@ export function TaskCard({ task, onUpdated }: TaskCardProps) {
       <div className="min-w-0 flex-1 text-left">
         <p
           className={cn(
-            "text-sm font-medium",
-            task.status === "done" && "line-through text-muted-foreground"
+            "text-sm font-semibold text-[#0F172A]",
+            task.status === "done" && "line-through text-[#64748B]"
           )}
         >
           {task.title}
         </p>
         {task.description && (
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="text-xs text-[#64748B] mt-0.5">
             {task.description}
           </p>
         )}
       </div>
 
       {isClickable && (
-        <ChevronRight className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+        <ChevronRight className="w-4 h-4 text-[#64748B] mt-0.5 shrink-0" />
       )}
 
       <button
         onClick={handleDelete}
         disabled={deleting}
-        className="ml-1 p-1 rounded hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors disabled:opacity-50 shrink-0"
+        className="ml-1 p-1 rounded-lg hover:bg-red-50 text-[#E2E8F0] hover:text-red-400 transition-all duration-200 disabled:opacity-50 shrink-0"
         title="Remove task"
       >
         <Trash2 className="w-3.5 h-3.5" />

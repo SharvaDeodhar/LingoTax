@@ -22,9 +22,9 @@ export function ProviderButton({
       disabled={disabled}
       className={cn(
         "w-full flex items-center justify-center gap-3 px-4 py-3",
-        "border border-gray-300 rounded-lg bg-white",
-        "text-sm font-medium text-gray-700",
-        "hover:bg-gray-50 transition-colors",
+        "border border-[#E2E8F0] rounded-xl bg-white shadow-ct-sm",
+        "text-sm font-semibold text-[#0F172A]",
+        "hover:shadow-ct-card hover:border-[#2F8AE5]/30 transition-all duration-200",
         "disabled:opacity-50 disabled:cursor-not-allowed",
         className
       )}

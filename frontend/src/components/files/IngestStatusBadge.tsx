@@ -10,10 +10,10 @@ const STATUS_CONFIG: Record<
   IngestStatus,
   { label: string; classes: string }
 > = {
-  pending:    { label: "Pending",    classes: "bg-gray-100 text-gray-600" },
-  processing: { label: "Processing", classes: "bg-yellow-100 text-yellow-700 animate-pulse" },
-  ready:      { label: "Ready",      classes: "bg-green-100 text-green-700" },
-  error:      { label: "Error",      classes: "bg-red-100 text-red-700" },
+  pending:    { label: "Pending",    classes: "bg-[#F8FAFC] text-[#64748B] border border-[#E2E8F0]" },
+  processing: { label: "Processing", classes: "bg-amber-50 text-amber-700 border border-amber-200 animate-pulse" },
+  ready:      { label: "Ready",      classes: "bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/20" },
+  error:      { label: "Error",      classes: "bg-red-50 text-red-600 border border-red-200" },
 };
 
 export function IngestStatusBadge({ status, className }: IngestStatusBadgeProps) {
