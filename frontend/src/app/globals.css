@@ -4,26 +4,29 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    /* Corporate Trust — Design Tokens (HSL format for Tailwind CSS variable compatibility) */
+    --background:        248 250 252;   /* #F8FAFC — Slate 50 */
+    --foreground:        15 23 42;      /* #0F172A — Slate 900 */
+    --card:              255 255 255;   /* #FFFFFF */
+    --card-foreground:   15 23 42;
+    --popover:           255 255 255;
+    --popover-foreground: 15 23 42;
+    --primary:           215 76% 54%;  /* #2F8AE5 */
+    --primary-foreground: 255 255 255;
+    --secondary:         210 59% 70%;  /* #7DB3E8 */
+    --secondary-foreground: 15 23 42;
+    --muted:             214 32% 91%;  /* #E2E8F0 */
+    --muted-foreground:  215 16% 47%;  /* #64748B */
+    --accent:            160 84% 39%;  /* #10B981 */
+    --accent-foreground: 255 255 255;
+    --destructive:       0 72% 51%;
+    --destructive-foreground: 255 255 255;
+    --border:            214 32% 91%;  /* #E2E8F0 */
+    --input:             214 32% 91%;
+    --ring:              215 76% 54%;  /* #2F8AE5 */
+    --radius:            0.75rem;
+
+    /* Chart colors — keep for compatibility */
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
@@ -63,17 +66,50 @@
   * {
     @apply border-border;
   }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-[#F8FAFC] text-[#0F172A] font-sans antialiased;
   }
 }
 
 @layer components {
+  /* Form inputs */
   .input-text {
-    @apply w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors;
+    @apply w-full px-3 py-2.5 text-sm border border-[#E2E8F0] rounded-xl
+           bg-white text-[#0F172A] placeholder:text-[#64748B]
+           focus:outline-none focus:ring-2 focus:ring-[#2F8AE5]/40 focus:border-[#2F8AE5]
+           disabled:opacity-50 disabled:cursor-not-allowed
+           transition-all duration-200;
   }
+
   .input-select {
-    @apply w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors;
+    @apply w-full px-3 py-2.5 text-sm border border-[#E2E8F0] rounded-xl
+           bg-white text-[#0F172A]
+           focus:outline-none focus:ring-2 focus:ring-[#2F8AE5]/40 focus:border-[#2F8AE5]
+           disabled:opacity-50 disabled:cursor-not-allowed
+           transition-all duration-200;
+  }
+
+  /* Corporate Trust component utilities */
+  .ct-btn-primary {
+    @apply bg-gradient-to-r from-[#2F8AE5] to-[#7DB3E8]
+           text-white font-semibold rounded-lg
+           hover:opacity-90 active:opacity-80
+           disabled:opacity-50 disabled:cursor-not-allowed
+           transition-all duration-200 shadow-ct-sm;
+  }
+
+  .ct-gradient-text {
+    @apply bg-gradient-to-r from-[#2F8AE5] to-[#7DB3E8] bg-clip-text text-transparent;
+  }
+
+  .ct-card {
+    @apply bg-white rounded-xl border border-[#E2E8F0] shadow-ct-card;
+  }
+
+  .ct-card-hover {
+    @apply transition-all duration-200
+           hover:-translate-y-1 hover:shadow-ct-hover;
   }
 }
 

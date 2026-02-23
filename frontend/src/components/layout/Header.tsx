@@ -21,13 +21,13 @@ export function Header() {
   const initials = (user?.email ?? "U")[0].toUpperCase();
 
   return (
-    <header className="h-14 border-b bg-white flex items-center justify-between px-4 shrink-0">
+    <header className="h-14 border-b border-[#E2E8F0] bg-white flex items-center justify-between px-5 shrink-0">
       <div />
 
       <div className="flex items-center gap-3">
         <Link
           href="/settings"
-          className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          className="p-1.5 text-[#64748B] hover:text-[#2F8AE5] hover:bg-[#2F8AE5]/8 rounded-lg transition-all duration-200"
           title="Settings"
         >
           <Settings className="w-4 h-4" />
@@ -40,13 +40,13 @@ export function Header() {
               alt="Profile"
               width={32}
               height={32}
-              className="rounded-full"
+              className="rounded-full shadow-ct-sm"
             />
           </Link>
         ) : (
           <Link
             href="/settings"
-            className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-medium"
+            className="w-8 h-8 rounded-full bg-gradient-to-br from-[#2F8AE5] to-[#7DB3E8] text-white flex items-center justify-center text-sm font-semibold shadow-ct-sm"
           >
             {initials}
           </Link>
@@ -54,7 +54,7 @@ export function Header() {
 
         <button
           onClick={handleLogout}
-          className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          className="p-1.5 text-[#64748B] hover:text-red-500 hover:bg-red-50 rounded-lg transition-all duration-200"
           title="Sign out"
         >
           <LogOut className="w-4 h-4" />

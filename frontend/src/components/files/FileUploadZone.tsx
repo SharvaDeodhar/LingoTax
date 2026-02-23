@@ -89,36 +89,41 @@ export function FileUploadZone({
     <div>
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors ${isDragActive
-            ? "border-blue-500 bg-blue-50"
+        className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all duration-200 ${
+          isDragActive
+            ? "border-[#2F8AE5] bg-gradient-to-br from-[#2F8AE5]/8 to-[#7DB3E8]/8 shadow-ct-card scale-[1.01]"
             : uploading
-              ? "border-gray-200 bg-gray-50 cursor-not-allowed"
-              : "border-gray-300 hover:border-gray-400 hover:bg-gray-50"
-          }`}
+              ? "border-[#E2E8F0] bg-[#F8FAFC] cursor-not-allowed opacity-70"
+              : "border-[#E2E8F0] bg-white hover:border-[#2F8AE5]/50 hover:shadow-ct-sm"
+        }`}
       >
         <input {...getInputProps()} />
-        <Upload className="w-8 h-8 mx-auto text-gray-400 mb-3" />
+        <Upload
+          className={`w-8 h-8 mx-auto mb-3 transition-colors ${
+            isDragActive ? "text-[#2F8AE5]" : "text-[#64748B]"
+          }`}
+        />
         {uploading ? (
           <div>
-            <p className="text-sm font-medium text-gray-700">{progress}</p>
-            <p className="text-xs text-muted-foreground mt-1">Please wait…</p>
+            <p className="text-sm font-semibold text-[#0F172A]">{progress}</p>
+            <p className="text-xs text-[#64748B] mt-1">Please wait…</p>
           </div>
         ) : isDragActive ? (
-          <p className="text-sm font-medium text-blue-600">Drop the PDF here</p>
+          <p className="text-sm font-semibold text-[#2F8AE5]">Drop the PDF here</p>
         ) : (
           <div>
-            <p className="text-sm font-medium text-gray-700">
+            <p className="text-sm font-semibold text-[#0F172A]">
               Drag & drop a PDF, or{" "}
-              <span className="text-blue-600">click to select</span>
+              <span className="text-[#2F8AE5] font-bold">click to select</span>
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-[#64748B] mt-1">
               Supports W-2, 1099, 1098-T, tax transcripts — PDF only
             </p>
           </div>
         )}
       </div>
       {error && (
-        <p className="mt-2 text-sm text-red-600">{error}</p>
+        <p className="mt-2 text-sm text-red-500 font-medium">{error}</p>
       )}
     </div>
   );

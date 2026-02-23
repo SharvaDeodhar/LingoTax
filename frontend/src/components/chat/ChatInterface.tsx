@@ -402,21 +402,21 @@ export function ChatInterface({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-white">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[#E2E8F0] bg-white">
         <div>
           {isGeneralMode ? (
             <>
-              <p className="text-sm font-medium">General Tax Help</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm font-semibold text-[#0F172A]">General Tax Help</p>
+              <p className="text-xs text-[#64748B]">
                 Ask any US tax question
               </p>
             </>
           ) : (
             <>
-              <p className="text-sm font-medium truncate max-w-[250px]">
+              <p className="text-sm font-semibold text-[#0F172A] truncate max-w-[250px]">
                 {doc!.filename}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-[#64748B]">
                 Ask anything about this document
               </p>
             </>
@@ -426,12 +426,12 @@ export function ChatInterface({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#F8FAFC]">
         {messages.length === 0 && !summarizing && (
-          <div className="text-center py-12 text-muted-foreground">
+          <div className="text-center py-12 text-[#64748B]">
             {isGeneralMode ? (
               <>
-                <p className="text-sm font-medium mb-2">
+                <p className="text-sm font-semibold mb-2">
                   Ask any US tax question
                 </p>
                 <p className="text-xs">
@@ -441,7 +441,7 @@ export function ChatInterface({
               </>
             ) : (
               <>
-                <p className="text-sm font-medium mb-2">
+                <p className="text-sm font-semibold mb-2">
                   {(ingestStatus !== "ready" || statusStage) ? "Analyzing your document…" : "Start chatting…"}
                 </p>
                 <p className="text-xs">
@@ -460,6 +460,38 @@ export function ChatInterface({
           <MessageBubble key={msg.id} message={msg} />
         ))}
 
+        {(loading || summarizing || statusStage || (doc && ingestStatus !== "ready")) && (
+          <div className="flex justify-start">
+            <div className="bg-white border border-[#E2E8F0] rounded-2xl rounded-tl-sm px-4 py-3 shadow-ct-card">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[#64748B] mr-1">
+                  {statusStage
+                    ? STAGE_LABELS[statusStage as keyof typeof STAGE_LABELS]
+                    : ingestStatus !== "ready"
+                      ? "Analyzing document…"
+                      : loading
+                        ? "Thinking…"
+                        : "Reading document…"}
+                </span>
+                <div className="flex gap-1">
+                  <span
+                    className="w-2 h-2 bg-[#2F8AE5]/50 rounded-full animate-bounce"
+                    style={{ animationDelay: "0ms" }}
+                  />
+                  <span
+                    className="w-2 h-2 bg-[#2F8AE5]/50 rounded-full animate-bounce"
+                    style={{ animationDelay: "150ms" }}
+                  />
+                  <span
+                    className="w-2 h-2 bg-[#2F8AE5]/50 rounded-full animate-bounce"
+                    style={{ animationDelay: "300ms" }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div ref={bottomRef} />
       </div>
 
@@ -471,7 +503,7 @@ export function ChatInterface({
       )}
 
       {/* Input */}
-      <form onSubmit={handleSend} className="border-t bg-white p-4">
+      <form onSubmit={handleSend} className="border-t border-[#E2E8F0] bg-white p-4">
         <div className="flex gap-2 relative">
           <input
             type="text"
@@ -489,15 +521,15 @@ export function ChatInterface({
                       : "Ask about your document…"
             }
             disabled={loading || summarizing || isListening}
-            className="flex-1 pl-3 pr-10 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            className="flex-1 pl-3 pr-10 py-2 border border-[#E2E8F0] rounded-xl bg-[#F8FAFC] text-sm text-[#0F172A] placeholder:text-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#2F8AE5]/40 focus:border-[#2F8AE5] disabled:opacity-50 transition-all duration-200"
           />
           <button
             type="button"
             onClick={toggleListening}
             disabled={loading || summarizing}
-            className={`absolute right-12 top-1.5 p-1.5 rounded-md transition-colors ${isListening
+            className={`absolute right-12 top-1.5 p-1.5 rounded-lg transition-all duration-200 ${isListening
               ? "text-red-600 bg-red-100 animate-pulse"
-              : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              : "text-[#64748B] hover:text-[#2F8AE5] hover:bg-[#2F8AE5]/8"
               } disabled:opacity-50`}
             title={isListening ? "Stop listening" : "Start dictating"}
           >
@@ -506,7 +538,7 @@ export function ChatInterface({
           <button
             type="submit"
             disabled={!question.trim() || loading || summarizing || isListening}
-            className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="p-2 bg-gradient-to-r from-[#2F8AE5] to-[#7DB3E8] text-white rounded-xl shadow-ct-sm hover:opacity-90 disabled:opacity-50 transition-all duration-200"
           >
             <Send className="w-4 h-4" />
           </button>

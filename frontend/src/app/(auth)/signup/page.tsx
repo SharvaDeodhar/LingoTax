@@ -51,22 +51,22 @@ export default function SignupPage() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-center mb-2">
+      <h2 className="text-xl font-bold text-center text-[#0F172A] mb-2">
         Create your account
       </h2>
-      <p className="text-sm text-muted-foreground text-center mb-6">
+      <p className="text-sm text-[#64748B] text-center mb-6">
         We&apos;ll send a 6-digit code to verify your email.
       </p>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
           {error}
         </div>
       )}
 
       <form onSubmit={handleEmailSignup} className="space-y-4 mb-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-[#0F172A] mb-1.5">
             Email address
           </label>
           <input
@@ -75,13 +75,13 @@ export default function SignupPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="input-text"
           />
         </div>
         <button
           type="submit"
           disabled={loading || !email}
-          className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          className="ct-btn-primary w-full py-2.5 text-sm"
         >
           {loading ? "Sending code…" : "Send verification code"}
         </button>
@@ -89,10 +89,10 @@ export default function SignupPage() {
 
       <div className="relative my-4">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-200" />
+          <div className="w-full border-t border-[#E2E8F0]" />
         </div>
-        <div className="relative flex justify-center text-xs text-muted-foreground">
-          <span className="bg-white px-2">or</span>
+        <div className="relative flex justify-center">
+          <span className="bg-white px-2 text-[#64748B] text-xs font-medium">or</span>
         </div>
       </div>
 
@@ -106,9 +106,9 @@ export default function SignupPage() {
         Continue with Google
       </ProviderButton>
 
-      <p className="text-center text-sm text-muted-foreground mt-4">
+      <p className="text-center text-sm text-[#64748B] mt-4">
         Already have an account?{" "}
-        <Link href="/login" className="text-blue-600 hover:underline">
+        <Link href="/login" className="text-[#2F8AE5] font-semibold hover:underline">
           Sign in
         </Link>
       </p>

@@ -79,7 +79,7 @@ export function TaskList() {
     return (
       <div className="space-y-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-20 bg-gray-100 rounded-lg animate-pulse" />
+          <div key={i} className="h-16 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl animate-pulse" />
         ))}
       </div>
     );
@@ -90,12 +90,12 @@ export function TaskList() {
       {groups.map(({ group, tasks }) => (
         <div key={group.id}>
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            <h3 className="text-xs font-bold text-[#64748B] uppercase tracking-widest">
               {group.name}
             </h3>
             <button
               onClick={() => setAddingToGroup(group.id)}
-              className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+              className="text-xs text-[#2F8AE5] font-semibold hover:underline flex items-center gap-1"
             >
               <Plus className="w-3 h-3" />
               Add
@@ -114,17 +114,17 @@ export function TaskList() {
                   if (e.key === "Escape") setAddingToGroup(null);
                 }}
                 placeholder="Task title…"
-                className="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 px-3 py-1.5 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2F8AE5]/40 focus:border-[#2F8AE5] bg-white"
               />
               <button
                 onClick={() => handleAddTask(group.id)}
-                className="px-2 py-1.5 bg-blue-600 text-white rounded-lg text-xs"
+                className="px-3 py-1.5 bg-gradient-to-r from-[#2F8AE5] to-[#7DB3E8] text-white rounded-lg text-xs font-semibold"
               >
                 Add
               </button>
               <button
                 onClick={() => setAddingToGroup(null)}
-                className="px-2 py-1.5 border rounded-lg text-xs text-gray-600"
+                className="px-3 py-1.5 border border-[#E2E8F0] rounded-lg text-xs text-[#64748B] hover:bg-[#F8FAFC]"
               >
                 Cancel
               </button>
@@ -133,7 +133,7 @@ export function TaskList() {
 
           <div className="space-y-2">
             {tasks.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-2">
+              <p className="text-xs text-[#64748B] py-2 italic">
                 No tasks yet — click Add to create one
               </p>
             ) : (

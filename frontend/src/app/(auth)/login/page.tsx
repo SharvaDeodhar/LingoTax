@@ -71,18 +71,19 @@ export default function LoginPage() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-center mb-6">Sign in to LinguaTax</h2>
+      <h2 className="text-xl font-bold text-center text-[#0F172A] mb-6">Sign in to LinguaTax</h2>
 
       {/* Tab selector */}
-      <div className="flex rounded-lg border border-gray-200 overflow-hidden mb-6">
+      <div className="flex rounded-xl border border-[#E2E8F0] mb-6 p-1 bg-[#F8FAFC] gap-1">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => { setTab(t.key); setError(null); }}
-            className={`flex-1 py-2 text-sm font-medium transition-colors ${tab === t.key
-                ? "bg-blue-600 text-white"
-                : "bg-white text-gray-600 hover:bg-gray-50"
-              }`}
+            className={`flex-1 py-2 text-sm font-semibold transition-all duration-200 ${
+              tab === t.key
+                ? "bg-gradient-to-r from-[#2F8AE5] to-[#7DB3E8] text-white rounded-lg shadow-ct-sm"
+                : "bg-transparent text-[#64748B] hover:text-[#0F172A] rounded-lg"
+            }`}
           >
             {t.label}
           </button>
@@ -90,7 +91,7 @@ export default function LoginPage() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
           {error}
         </div>
       )}
@@ -107,9 +108,9 @@ export default function LoginPage() {
             </svg>
             Continue with Google
           </ProviderButton>
-          <p className="text-center text-sm text-muted-foreground">
+          <p className="text-center text-sm text-[#64748B]">
             No account yet?{" "}
-            <Link href="/signup" className="text-blue-600 hover:underline">
+            <Link href="/signup" className="text-[#2F8AE5] font-semibold hover:underline">
               Sign up with email
             </Link>
           </p>
@@ -120,7 +121,7 @@ export default function LoginPage() {
       {tab === "otp" && (
         <form onSubmit={handleOtpRequest} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-semibold text-[#0F172A] mb-1.5">
               Email address
             </label>
             <input
@@ -129,19 +130,19 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input-text"
             />
           </div>
           <button
             type="submit"
             disabled={loading || !email}
-            className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="ct-btn-primary w-full py-2.5 text-sm"
           >
             {loading ? "Sending…" : "Send 6-digit code"}
           </button>
-          <p className="text-center text-sm text-muted-foreground">
+          <p className="text-center text-sm text-[#64748B]">
             No account yet?{" "}
-            <Link href="/signup" className="text-blue-600 hover:underline">
+            <Link href="/signup" className="text-[#2F8AE5] font-semibold hover:underline">
               Sign up
             </Link>
           </p>
@@ -152,7 +153,7 @@ export default function LoginPage() {
       {tab === "password" && (
         <form onSubmit={handlePasswordLogin} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-semibold text-[#0F172A] mb-1.5">
               Email address
             </label>
             <input
@@ -161,11 +162,11 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input-text"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-semibold text-[#0F172A] mb-1.5">
               Password
             </label>
             <input
@@ -174,13 +175,13 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input-text"
             />
           </div>
           <div className="text-right">
             <Link
               href="/forgot-password"
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm text-[#2F8AE5] font-medium hover:underline"
             >
               Forgot password?
             </Link>
@@ -188,7 +189,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading || !email || !password}
-            className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="ct-btn-primary w-full py-2.5 text-sm"
           >
             {loading ? "Signing in…" : "Sign in"}
           </button>
